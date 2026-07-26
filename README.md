@@ -5,7 +5,7 @@
 ![Versión](https://img.shields.io/badge/version-1.0-gold)
 ![Licencia](https://img.shields.io/badge/license-MIT-blue)
 
-👉 **[Usar Scriptorium en vivo](https://tu-usuario.github.io/scriptorium/)**
+👉 **[Usar Scriptorium en vivo](https://adrigb.github.io/scriptorium/)**
 
 ---
 
