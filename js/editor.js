@@ -13,6 +13,12 @@ const rawCount = () => $('rawCount');
 const processBtn = () => $('processBtn');
 const fabContainer = () => $('fabContainer');
 
+function setProcessedCount(value) {
+    processedCount().textContent = value;
+    const status = $('statusFields');
+    if (status) status.textContent = value + ' campos';
+}
+
 /* ─── Helpers ─── */
 export function fIcon(k) {
     const l = k.toLowerCase();
@@ -284,7 +290,7 @@ export function addField(key, val) {
     state.proc.data[key] = val;
     state.proc.edited.add(key); state.editor.added.add(key); state.editor.removed.delete(key);
     state.vault.dirty = true;
-    processedCount().textContent = Object.keys(state.proc.data).length;
+    setProcessedCount(Object.keys(state.proc.data).length);
     renderProc();
 }
 
@@ -295,7 +301,7 @@ export function deleteField(key) {
     else state.editor.removed.add(key);
     delete getExtracted()[key];
     state.vault.dirty = true;
-    processedCount().textContent = Object.keys(state.proc.data).length;
+    setProcessedCount(Object.keys(state.proc.data).length);
     renderProc(); updFab();
     showToast('"' + key + '" eliminado', 'info');
 }
@@ -323,7 +329,7 @@ export function renameField(oldKey, newName) {
 
 /* ─── Process text ─── */
 export function processText() {
-    if (!Object.keys(getExtracted()).length && !$('sysPrompt').value.trim()) return;
+    if (!Object.keys(getExtracted()).length && !$('sysPrompt').value.trim() && !state.characterBook.present) return;
     const cn = charNameInput().value.trim() || '{{char}}', un = userNameInput().value.trim() || '{{user}}',
         persona = $('userPersona').value.trim(), sp = $('sysPrompt').value.trim(),
         cR = /\{\{char\}\}/gi, uR = /\{\{user\}\}/gi;
@@ -347,7 +353,7 @@ export function processText() {
         state.proc.data[k] = state.proc.edited.has(k) && prev[k] ? prev[k] : persona.replace(cR, () => cn).replace(uR, () => un);
     }
     for (const ek of state.editor.added) if (prev[ek] !== undefined && state.proc.data[ek] === undefined) state.proc.data[ek] = prev[ek];
-    processedCount().textContent = Object.keys(state.proc.data).length;
+    setProcessedCount(Object.keys(state.proc.data).length);
     state.vault.dirty = true;
     renderProc();
     $('tabProcessed').click();
@@ -369,11 +375,12 @@ export function togEd() {
 
 /* ─── FAB ─── */
 export function updFab() {
-    const hd = Object.keys(state.proc.data).length > 0;
-    const ip = !processedView().classList.contains('hidden');
-    fabContainer().classList.toggle('hidden', !hd || !ip);
-    const ew = $('exportFabWrap');
-    if (ew) ew.classList.toggle('hidden', !state.editor.active);
+    const hasContent = Boolean(state.file.uploaded) && (
+        Object.keys(state.proc.data).length > 0 ||
+        Object.keys(getExtracted()).length > 0 ||
+        state.characterBook.present
+    );
+    fabContainer().classList.toggle('hidden', !hasContent);
 }
 
 /* ─── Expand modal ─── */
@@ -431,11 +438,87 @@ export function renderJSON() {
     const jeE = $('jsonEditorEmpty'), jeA = $('jsonEditorActive');
     if (!state.file.uploaded) { jeE.classList.remove('hidden'); jeA.classList.add('hidden'); return; }
     jeE.classList.add('hidden'); jeA.classList.remove('hidden');
-    const cur = Object.keys(state.proc.data).length ? buildExp() : deepClone(state.file.uploaded);
+    const cur = buildExp();
     $('jsonEditorTextarea').value = JSON.stringify(cur, null, 2);
     state.jsonEditor.snap = deepClone(cur);
     state.jsonEditor.dirty = false;
     updJS();
+    setJsonMode(state.jsonEditor.mode || 'tree');
+}
+
+function appendTreeNode(parent, key, value, depth = 0) {
+    const isContainer = value !== null && typeof value === 'object';
+    if (isContainer) {
+        const details = document.createElement('details');
+        details.className = 'json-tree-branch';
+        details.open = depth < 2;
+
+        const summary = document.createElement('summary');
+        const keyEl = document.createElement('span');
+        keyEl.className = 'json-tree-key';
+        keyEl.textContent = key;
+        const count = document.createElement('span');
+        count.className = 'json-tree-count';
+        const keys = Object.keys(value);
+        count.textContent = Array.isArray(value) ? `[${keys.length}]` : `{${keys.length}}`;
+        summary.append(keyEl, count);
+
+        const children = document.createElement('div');
+        children.className = 'json-tree-children';
+        keys.forEach(childKey => appendTreeNode(children, childKey, value[childKey], depth + 1));
+        details.append(summary, children);
+        parent.appendChild(details);
+        return;
+    }
+
+    const row = document.createElement('div');
+    row.className = 'json-tree-leaf';
+    const keyEl = document.createElement('span');
+    keyEl.className = 'json-tree-key';
+    keyEl.textContent = key;
+    const valueEl = document.createElement('span');
+    const type = value === null ? 'null' : typeof value;
+    valueEl.className = `json-tree-value json-tree-${type}`;
+    valueEl.textContent = type === 'string' ? JSON.stringify(value) : String(value);
+    row.append(keyEl, valueEl);
+    parent.appendChild(row);
+}
+
+export function renderJSONTree() {
+    const tree = $('jsonTreeView');
+    if (!tree) return false;
+    let parsed;
+    try {
+        parsed = JSON.parse($('jsonEditorTextarea').value);
+    } catch {
+        showToast('Corrige el JSON antes de abrir el arbol', 'error');
+        return false;
+    }
+    tree.replaceChildren();
+    const root = document.createElement('div');
+    root.className = 'json-tree-root';
+    if (parsed !== null && typeof parsed === 'object') {
+        Object.keys(parsed).forEach(key => appendTreeNode(root, key, parsed[key], 0));
+    } else {
+        appendTreeNode(root, 'valor', parsed, 0);
+    }
+    tree.appendChild(root);
+    return true;
+}
+
+export function setJsonMode(mode) {
+    const next = mode === 'code' ? 'code' : 'tree';
+    if (next === 'tree' && !renderJSONTree()) return false;
+    state.jsonEditor.mode = next;
+    $('jsonTreeView')?.classList.toggle('hidden', next !== 'tree');
+    $('jsonRawView')?.classList.toggle('hidden', next !== 'code');
+    $('jsonCodeActions')?.classList.toggle('hidden', next !== 'code');
+    const treeBtn = $('jsonTreeModeBtn'), rawBtn = $('jsonRawModeBtn');
+    treeBtn?.setAttribute('aria-pressed', String(next === 'tree'));
+    rawBtn?.setAttribute('aria-pressed', String(next === 'code'));
+    treeBtn?.classList.toggle('active', next === 'tree');
+    rawBtn?.classList.toggle('active', next === 'code');
+    return true;
 }
 
 export function updJS() {
@@ -490,9 +573,10 @@ export function applyJE() {
         if (nm) { charNameInput().value = nm; updLP(); }
         rawCount().textContent = count;
         renderRaw(); renderJSON();
-        processBtn().disabled = count === 0;
+        const hasContent = count > 0 || state.characterBook.present;
+        processBtn().disabled = !hasContent;
         if (count > 0 && (userNameInput().value.trim() || $('sysPrompt').value.trim())) processText();
-        else { updJS(); updLorebookCount(); showToast(count > 0 ? 'Aplicado: ' + count + ' campo(s)' : 'Aplicado', 'info'); }
+        else { updJS(); updLorebookCount(); showToast(hasContent ? 'Aplicado: ' + count + ' campo(s)' : 'Aplicado', 'info'); }
         state.vault.dirty = true;
     } catch (err) { showToast('Error: ' + err.message, 'error'); }
 }
@@ -574,6 +658,8 @@ function decorateAltGreetings() {
 export function updLorebookCount() {
     const el = $('lorebookCount');
     if (el) el.textContent = state.characterBook.entries.length;
+    const status = $('statusLorebook');
+    if (status) status.textContent = state.characterBook.entries.length + ' entradas de lorebook';
 }
 
 export function addLorebookEntry() {

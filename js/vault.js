@@ -89,26 +89,30 @@ function injectModal() {
     });
 
     // FIX: sin timeout de 50ms, el listener en app.js es sincrono
-    $('vaultSaveCurrentBtn')?.addEventListener('click', async () => {
-        try {
-            const ev = new CustomEvent('vault:request-card', { detail: {} });
-            document.dispatchEvent(ev);
-            if (!ev.detail?.card) {
-                const { showToast } = await import('./utils.js');
-                showToast('No hay carta para guardar', 'info');
-                return;
-            }
-            const charName = document.getElementById('charName')?.value?.trim() || 'Sin nombre';
-            await vault.saveCharacter({ card: ev.detail.card, name: charName, charName });
-            await renderList();
+    $('vaultSaveCurrentBtn')?.addEventListener('click', saveCurrentToVault);
+}
+
+export async function saveCurrentToVault() {
+    try {
+        const ev = new CustomEvent('vault:request-card', { detail: {} });
+        document.dispatchEvent(ev);
+        if (!ev.detail?.card) {
             const { showToast } = await import('./utils.js');
-            showToast(`"${charName}" guardado en boveda`);
-        } catch (err) {
-            console.error(err);
-            const { showToast } = await import('./utils.js');
-            showToast('Error al guardar: ' + err.message, 'error');
+            showToast('No hay carta para guardar', 'info');
+            return false;
         }
-    });
+        const charName = document.getElementById('charName')?.value?.trim() || 'Sin nombre';
+        await vault.saveCharacter({ card: ev.detail.card, name: charName, charName });
+        if ($('vaultModal')) await renderList();
+        const { showToast } = await import('./utils.js');
+        showToast(`"${charName}" guardado en boveda`);
+        return true;
+    } catch (err) {
+        console.error(err);
+        const { showToast } = await import('./utils.js');
+        showToast('Error al guardar: ' + err.message, 'error');
+        return false;
+    }
 }
 
 async function renderList() {

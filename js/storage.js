@@ -105,6 +105,8 @@ export class Vault {
                 file: state.file.uploaded, extracted: { ...state.file.extracted },
                 procData: { ...state.proc.data }, procEdited: [...state.proc.edited],
                 editorAdded: [...state.editor.added], editorRemoved: [...state.editor.removed],
+                characterBook: structuredClone(state.characterBook),
+                altGreetings: structuredClone(state.altGreetings),
                 charName: document.getElementById('charName')?.value || '',
                 userName: document.getElementById('userName')?.value || '',
                 sysPrompt: document.getElementById('sysPrompt')?.value || '',
@@ -134,7 +136,12 @@ export class Vault {
         this._autoSaveTimer = setInterval(async () => {
             try {
                 const s = getStateFn();
-                if (s && s.vault.dirty && Object.keys(s.proc.data).length > 0) {
+                const hasContent = s && (
+                    Object.keys(s.proc.data).length > 0 ||
+                    s.characterBook?.present ||
+                    s.altGreetings?.list?.length > 0
+                );
+                if (s && s.vault.dirty && hasContent) {
                     const saved = await this.saveSession(s);
                     if (saved) s.vault.dirty = false;
                 }

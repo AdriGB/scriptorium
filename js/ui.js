@@ -1,6 +1,6 @@
 import state, { STORAGE_KEYS } from './state.js';
 import { $, Storage, showToast, trapFocus } from './utils.js';
-import { renderJSON, updJS, applyJE, updFab, renderLorebook } from './editor.js';
+import { renderJSON, updJS, applyJE, updFab, renderLorebook, setJsonMode } from './editor.js';
 
 /* ─── Canvas ─── */
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -42,6 +42,11 @@ export function initCanvas() {
 /* ─── Sidebar ─── */
 export function initSidebar() {
     const leftPanel = $('leftPanel'), btn = $('sidebarToggleBtn');
+    const groups = [...leftPanel.querySelectorAll('.sidebar-group')];
+    groups.forEach(group => group.addEventListener('toggle', () => {
+        if (!group.open) return;
+        groups.forEach(other => { if (other !== group) other.open = false; });
+    }));
     function setCollapsed(c) {
         leftPanel.classList.toggle('panel-collapsed', c);
         btn.classList.toggle('is-collapsed', c);
@@ -236,4 +241,6 @@ export function initJsonEditor() {
         jeT.value = JSON.stringify(state.jsonEditor.snap, null, 2); updJS(); showToast('Revertido');
     });
     $('jsonApplyBtn').addEventListener('click', applyJE);
+    $('jsonTreeModeBtn')?.addEventListener('click', () => setJsonMode('tree'));
+    $('jsonRawModeBtn')?.addEventListener('click', () => setJsonMode('code'));
 }

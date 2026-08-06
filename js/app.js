@@ -3,7 +3,7 @@ import { $, showToast, deepClone } from './utils.js';
 import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
 import vault from './storage.js';
-import { openVault } from './vault.js';
+import { openVault, saveCurrentToVault } from './vault.js';
 import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel, exportCurrentProfile, importProfileFile, exportAllProfiles, importProfilesBundle } from './profiles.js';
 import { processText, renderRaw, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount } from './editor.js';
 import { openExpModal, closeExpModal, copyAll } from './export.js';
@@ -28,11 +28,31 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rawCount = $('rawCount');
     const searchContainer = $('searchContainer');
 
+    const hasCardContent = (count = Object.keys(getExtracted()).length) =>
+        count > 0 || Object.keys(state.proc.data).length > 0 || state.characterBook.present;
+
+    function setWorkspaceLoaded(loaded, fileName = '', count = 0) {
+        $('workspaceEmpty')?.classList.toggle('hidden', loaded);
+        $('workspaceTabs')?.classList.toggle('hidden', !loaded);
+        $('workspaceStatusBar')?.classList.toggle('hidden', !loaded);
+        $('workspaceViews')?.classList.toggle('hidden', !loaded);
+        const fileStatus = $('statusFileName');
+        const fieldStatus = $('statusFields');
+        if (fileStatus) fileStatus.textContent = loaded ? (fileName || 'Carta cargada') : 'Sin carta';
+        if (fieldStatus) fieldStatus.textContent = count + ' campos';
+    }
+
+    function refreshVisibleJSON() {
+        const jsonVisible = !$('jsonView')?.classList.contains('hidden');
+        if (jsonVisible && !state.jsonEditor.dirty) renderJSON();
+    }
+
     if (!fileInput || !dropzone) { console.error('DOM critico no encontrado'); return; }
 
     /* ── Profiles BEFORE vault session ── */
     loadProfiles();
     renderJSON();
+    setWorkspaceLoaded(false);
 
     /* ── Vault init ── */
     let dbReady = false;
@@ -63,6 +83,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                     state.proc.edited = new Set(saved.procEdited || []);
                     state.editor.added = new Set(saved.editorAdded || []);
                     state.editor.removed = new Set(saved.editorRemoved || []);
+                    state.characterBook = deepClone(saved.characterBook || state.characterBook);
+                    state.altGreetings = deepClone(saved.altGreetings || state.altGreetings);
 
                     if (saved.activeProfileId && state.profiles.lib[saved.activeProfileId]) {
                         state.profiles.active = saved.activeProfileId;
@@ -75,8 +97,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                     sysPromptInput.value = saved.sysPrompt ?? '';
                     userPersonaInput.value = saved.userPersona ?? '';
 
-                    processBtn.disabled = false;
-                    processText();
+                    const restoredCount = Object.keys(state.file.extracted).length;
+                    processBtn.disabled = !hasCardContent(restoredCount);
+                    setWorkspaceLoaded(true, saved.charName ? `Sesion: ${saved.charName}` : 'Sesion recuperada', restoredCount);
+                    if (restoredCount > 0 || Object.keys(state.proc.data).length > 0 || sysPromptInput.value.trim()) processText();
+                    else if (state.characterBook.present) $('tabLorebook')?.click();
                     state.vault.dirty = false;
 
                     if (saved.editorActive && !state.editor.active) togEd();
@@ -92,6 +117,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     /* ── Vault buttons ── */
     $('vaultBtn')?.addEventListener('click', openVault);
     $('vaultStatus')?.addEventListener('click', openVault);
+    $('emptyVaultBtn')?.addEventListener('click', openVault);
+    $('saveActionVaultBtn')?.addEventListener('click', saveCurrentToVault);
 
     /* ── Vault events ── */
     document.addEventListener('vault:load-card', (e) => {
@@ -104,10 +131,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (name && charNameInput) { charNameInput.value = name; updLP(); }
         if (rawCount) rawCount.textContent = count;
         renderRaw();
-        if (processBtn) processBtn.disabled = count === 0;
+        if (processBtn) processBtn.disabled = !hasCardContent(count);
+        setWorkspaceLoaded(true, name || 'Carta de la boveda', count);
         renderJSON();
         updLorebookCount();
-        if (userNameInput?.value.trim() || sysPromptInput?.value.trim()) processText();
+        if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
+        else if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
     });
 
     document.addEventListener('vault:request-card', (e) => {
@@ -131,9 +160,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('importProfilesBundleInput')?.addEventListener('change', async (e) => { const file = e.target.files?.[0]; if (file) await importProfilesBundle(file); e.target.value = ''; });
 
     // Config inputs mark dirty + update labels
-    charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
-    userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
-    sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; });
+    charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); });
+    userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); });
+    sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; refreshVisibleJSON(); });
     userPersonaInput?.addEventListener('input', () => { state.vault.dirty = true; });
 
     /* ── File handling ── */
@@ -168,27 +197,32 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetCardState();
         const dup = extractFields(state.file.uploaded);
         const count = Object.keys(getExtracted()).length;
-        if (count === 0) {
+        const hasContent = hasCardContent(count);
+        if (!hasContent) {
             processBtn.disabled = true;
             if (rawCount) rawCount.textContent = '0';
             const pc = $('processedCount'); if (pc) pc.textContent = '0';
             const rv = $('rawView'); if (rv) rv.replaceChildren();
             const pv = $('processedView');
             if (pv) pv.innerHTML = '<p class="text-text3 italic text-center py-12">No se encontraron campos compatibles.</p>';
+            setWorkspaceLoaded(true, fn, count);
             renderJSON(); updFab(); updLorebookCount();
             return setStatus('Tomo vacio: no contiene campos compatibles.', 'error');
         }
         const nm = state.file.uploaded.name || state.file.uploaded.data?.name || state.file.uploaded.char_name || '';
         if (nm && charNameInput) { charNameInput.value = nm; updLP(); }
         let msg = '✓ ' + fn + ' - ' + count + ' campo(s).';
+        if (state.characterBook.present) msg += ' ' + state.characterBook.entries.length + ' entrada(s) de lorebook.';
         if (dup > 0) msg += ' (' + dup + ' dup. resueltos)';
         setStatus(msg, 'success');
         if (rawCount) rawCount.textContent = count;
         renderRaw();
-        if (processBtn) processBtn.disabled = false;
+        if (processBtn) processBtn.disabled = !hasContent;
+        setWorkspaceLoaded(true, fn, count);
         renderJSON();
         updLorebookCount();
-        if (userNameInput?.value.trim() || sysPromptInput?.value.trim()) processText();
+        if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
+        else if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
         else $('tabRaw')?.click();
     }
 
@@ -196,6 +230,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     dropzone.addEventListener('dragleave', () => dropzone.classList.remove('drag-over'));
     dropzone.addEventListener('drop', e => { e.preventDefault(); dropzone.classList.remove('drag-over'); const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f); });
     fileInput.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) handleFile(f); });
+    const centerDropzone = $('centerDropzone');
+    centerDropzone?.addEventListener('dragover', e => { e.preventDefault(); centerDropzone.classList.add('drag-over'); });
+    centerDropzone?.addEventListener('dragleave', () => centerDropzone.classList.remove('drag-over'));
+    centerDropzone?.addEventListener('drop', e => { e.preventDefault(); centerDropzone.classList.remove('drag-over'); const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f); });
 
     /* ── Process / Clear ── */
     processBtn?.addEventListener('click', processText);
@@ -228,6 +266,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (pv) pv.innerHTML = '<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan.</p></div>';
         renderJSON();
         updLorebookCount();
+        setWorkspaceLoaded(false);
         setActiveTab('tabProcessed');
         showToast('Tomo purificado');
         if (dbReady) { try { await vault.clearSession(); } catch {} }
@@ -239,6 +278,30 @@ document.addEventListener('DOMContentLoaded', async () => {
     /* ── FAB ── */
     $('exportJsonBtn')?.addEventListener('click', openExpModal);
     $('copyAllBtn')?.addEventListener('click', copyAll);
+
+    /* ── Instalacion PWA ── */
+    let installPrompt = null;
+    const installBtn = $('installBtn');
+    window.addEventListener('beforeinstallprompt', e => {
+        e.preventDefault();
+        installPrompt = e;
+        installBtn?.classList.remove('hidden');
+    });
+    installBtn?.addEventListener('click', async () => {
+        if (!installPrompt) {
+            showToast('La instalacion no esta disponible en este navegador', 'info');
+            return;
+        }
+        installPrompt.prompt();
+        await installPrompt.userChoice;
+        installPrompt = null;
+        installBtn.classList.add('hidden');
+    });
+    window.addEventListener('appinstalled', () => {
+        installPrompt = null;
+        installBtn?.classList.add('hidden');
+        showToast('Scriptorium instalado');
+    });
 
     /* ── Keyboard shortcuts ── */
     document.addEventListener('keydown', e => {

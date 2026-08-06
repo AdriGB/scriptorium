@@ -2,7 +2,7 @@
 
 **Scriptorium** es una herramienta web liviana, moderna y sin dependencias pesadas diseñada para la edición, formateo y gestión de tarjetas de personajes de IA (*CharaCardV2*) e historias RPG.
 
-![Versión](https://img.shields.io/badge/version-1.1-gold)
+![Versión](https://img.shields.io/badge/version-1.2.2-gold)
 ![Licencia](https://img.shields.io/badge/license-MIT-blue)
 
 👉 **[Usar Scriptorium en vivo](https://adrigb.github.io/scriptorium/)**
@@ -18,11 +18,11 @@
 * **Aislamiento de Metadatos:** Gestión de campos personalizados mediante el namespace `extensions.scriptorium` dentro de `data` (según la especificación V2), con versionado explícito de esquema (`version: 1`), evitando mezclar notas humanas con datos estructurados.
 * **Compatibilidad hacia atrás:** Capacidad de lectura y extracción de esquemas y formatos legados (incluyendo `extensions` en la raíz) sin romper tarjetas antiguas. Migración automática al formato correcto al exportar.
 * **Bóveda de Personajes:** Almacenamiento persistente en IndexedDB con guardado automático, exportación e importación de bundles (`.scriptorium`), límite de 500 personajes y actualización por nombre.
-* **Recuperación de Sesión:** Al recargar la página, ofrece restaurar la última sesión guardada incluyendo perfil activo, estado del editor, campos procesados y nombres de personaje/usuario.
+* **Recuperación de Sesión:** Al recargar la página, ofrece restaurar la última sesión guardada incluyendo perfil activo, campos procesados, lorebook, saludos alternativos y nombres de personaje/usuario.
 * **Manejo de Perfiles:** Creación, guardado y alternancia de perfiles de aventurero y prompts del sistema en almacenamiento local (*LocalStorage*).
 * **Modo Editor Interactivo:** Renombrado, reordenado, adición y eliminación de campos personalizados en vivo con confirmación de doble clic.
-* **Editor JSON integrado:** Inspección y edición directa del árbol JSON con validación de sintaxis al instante, detección de cambios (dirty), formateo y reversión.
-* **Exportación Múltiple:** Descarga como JSON formateado (`chara_card_v2`), como PNG con metadatos embebidos, o copia al portapapeles de todo el texto procesado.
+* **Editor JSON integrado:** Vista de árbol de solo lectura y vista de código editable, con validación de sintaxis al instante, detección de cambios, formateo y reversión.
+* **Exportación Múltiple:** Descarga como JSON formateado (`chara_card_v2`), como PNG con metadatos embebidos, o copia al portapapeles de campos, lorebook y saludos alternativos.
 * **Traducción Integrada:** Utilidad rápida de traducción de campos para adaptar escenarios o respuestas al español, con aviso de privacidad obligatorio antes del primer uso.
 * **Procesado Local:** Todos los archivos se procesan en el navegador. Los datos no abandonan el dispositivo salvo el texto enviado a Google Translate.
 * **Interfaz Themed & Oscura:** Diseño responsivo con estética *Dark Fantasy*, animaciones sutiles, canvas de estrellas y soporte para atajos de teclado.

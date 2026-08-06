@@ -1,13 +1,15 @@
 {
     "name": "scriptorium",
-    "version": "1.2.0",
+    "version": "1.2.2",
     "private": true,
     "description": "Editor ligero y offline-first para tarjetas de personaje CharaCard v2 — compatible con PNG y JSON, con boveda IndexedDB y traduccion integrada.",
     "scripts": {
         "build:css": "tailwindcss -i ./assets/tailwind.css -o ./assets/app.css --minify",
-        "check": "npm run build:css && esbuild js/app.js --bundle --format=esm --outfile=dist/check.js"
+        "test": "node ./tests/regression.mjs",
+        "check": "npm run build:css && esbuild ./js/app.js --bundle --format=esm --outfile=dist/check.js && npm test"
     },
     "devDependencies": {
+        "@fortawesome/fontawesome-free": "^6.7.2",
         "esbuild": "^0.25.0",
         "tailwindcss": "^3.4.17"
     },

@@ -25,10 +25,10 @@ module.exports = {
                 editorDim: '#1a4a3e'
             },
             fontFamily: {
-                cinzel: ['Cinzel', 'serif'],
-                cinzelDeco: ['Cinzel Decorative', 'serif'],
-                crimson: ['Crimson Pro', 'serif'],
-                dmMono: ['DM Mono', 'monospace']
+                cinzel: ['Georgia', 'Cambria', 'serif'],
+                cinzelDeco: ['Georgia', 'Cambria', 'serif'],
+                crimson: ['Georgia', 'Cambria', 'serif'],
+                dmMono: ['Consolas', 'Cascadia Mono', 'monospace']
             },
             animation: {
                 'pulse-glow': 'pulseGlow 4s ease-in-out infinite',

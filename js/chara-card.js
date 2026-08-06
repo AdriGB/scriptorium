@@ -167,7 +167,9 @@ export function buildExp() {
     const extFields = {};
     for (const [k, v] of Object.entries(state.proc.data)) {
         if (typeof v !== 'string') continue;
-        if (k === 'system_prompt_global') { card.data.system_prompt = v; continue; }
+        // Se sincroniza mas abajo desde el control global para evitar conservar
+        // un valor procesado obsoleto cuando el usuario cambia o vacia el campo.
+        if (k === 'system_prompt_global') continue;
         if (k in card.data || V2_DATA_FIELDS.has(k)) { card.data[k] = v; continue; }
         if (k.includes('.')) {
             try { setNestedValue(card.data, k, v); }
@@ -192,6 +194,16 @@ export function buildExp() {
 
     if (card.data.extensions?.scriptorium?.fields && Object.keys(card.data.extensions.scriptorium.fields).length === 0) {
         delete card.data.extensions.scriptorium.fields;
+    }
+
+    // El prompt global visible siempre prevalece en la tarjeta que se exporta,
+    // incluso antes de ejecutar "Invocar y Sustituir".
+    const globalPrompt = $('sysPrompt')?.value.trim() || '';
+    if (globalPrompt) {
+        const userName = $('userName')?.value.trim() || '{{user}}';
+        card.data.system_prompt = globalPrompt
+            .replace(/\{\{char\}\}/gi, () => cn)
+            .replace(/\{\{user\}\}/gi, () => userName);
     }
 
     // Character Book

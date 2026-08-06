@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'scriptorium-v1.2.1';
+const CACHE_VERSION = 'scriptorium-v1.2.2';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 
 const APP_SHELL = [
@@ -6,6 +6,15 @@ const APP_SHELL = [
     './index.html',
     './manifest.webmanifest',
     './assets/app.css',
+    './assets/fontawesome/css/all.min.css',
+    './assets/fontawesome/webfonts/fa-brands-400.ttf',
+    './assets/fontawesome/webfonts/fa-brands-400.woff2',
+    './assets/fontawesome/webfonts/fa-regular-400.ttf',
+    './assets/fontawesome/webfonts/fa-regular-400.woff2',
+    './assets/fontawesome/webfonts/fa-solid-900.ttf',
+    './assets/fontawesome/webfonts/fa-solid-900.woff2',
+    './assets/fontawesome/webfonts/fa-v4compatibility.ttf',
+    './assets/fontawesome/webfonts/fa-v4compatibility.woff2',
 
     './js/app.js',
     './js/chara-card.js',
@@ -57,10 +66,7 @@ self.addEventListener('fetch', event => {
     // No cache external services
     if (
         url.hostname.includes('translate.googleapis.com') ||
-        url.hostname.includes('translate.google.com') ||
-        url.hostname.includes('fonts.googleapis.com') ||
-        url.hostname.includes('fonts.gstatic.com') ||
-        url.hostname.includes('cdnjs.cloudflare.com')
+        url.hostname.includes('translate.google.com')
     ) {
         return;
     }

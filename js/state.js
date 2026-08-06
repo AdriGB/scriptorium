@@ -28,7 +28,7 @@ const state = {
     file: { uploaded: null, extracted: {} },
     proc: { data: {}, edited: new Set() },
     editor: { active: false, added: new Set(), removed: new Set(), delKey: null, delTm: null },
-    jsonEditor: { snap: null, dirty: false, err: null },
+    jsonEditor: { snap: null, dirty: false, err: null, mode: 'tree' },
     characterBook: { present: false, metadata: {}, entries: [] },
     altGreetings: { original: '', list: [], current: 0 },
     profiles: {

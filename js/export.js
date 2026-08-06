@@ -20,9 +20,67 @@ export function closeExpModal() {
     if (pngBtn) pngBtn.disabled = true;
 }
 
-export function copyAll() {
-    if (!Object.keys(state.proc.data).length) return;
-    copyClip(Object.entries(state.proc.data).map(([k, v]) => '=== ' + k.toUpperCase().replace(/_/g, ' ') + ' ===\n' + v).join('\n\n'));
+export async function copyAll() {
+    const sections = [];
+    const globalPrompt = $('sysPrompt')?.value.trim() || '';
+    const charName = $('charName')?.value.trim() || '{{char}}';
+    const userName = $('userName')?.value.trim() || '{{user}}';
+    const hasProcessedFields = Object.keys(state.proc.data).length > 0;
+    const processed = Object.fromEntries(
+        Object.entries(hasProcessedFields ? state.proc.data : state.file.extracted)
+            .map(([key, value]) => [key, typeof value === 'string'
+                ? value.replace(/\{\{char\}\}/gi, () => charName).replace(/\{\{user\}\}/gi, () => userName)
+                : value])
+    );
+    delete processed.system_prompt_global;
+
+    // El prompt de la interfaz forma parte de la exportacion actual aunque aun
+    // no se haya ejecutado la sustitucion visual.
+    if (globalPrompt) {
+        const resolvedPrompt = globalPrompt
+            .replace(/\{\{char\}\}/gi, () => charName)
+            .replace(/\{\{user\}\}/gi, () => userName);
+        sections.push(`=== SYSTEM PROMPT GLOBAL ===\n${resolvedPrompt}`);
+    }
+
+    for (const [key, value] of Object.entries(processed)) {
+        if (typeof value !== 'string' || !value.trim()) continue;
+        sections.push(`=== ${key.toUpperCase().replace(/_/g, ' ')} ===\n${value}`);
+    }
+
+    if (state.characterBook.present) {
+        const metadata = state.characterBook.metadata || {};
+        const bookParts = [];
+
+        if (metadata.name) bookParts.push(`Nombre: ${metadata.name}`);
+        if (metadata.description) bookParts.push(`Descripción: ${metadata.description}`);
+
+        state.characterBook.entries.forEach((entry, index) => {
+            const entryParts = [`--- ENTRADA ${index + 1} ---`];
+            if (entry.name) entryParts.push(`Nombre: ${entry.name}`);
+            entryParts.push(`Claves: ${Array.isArray(entry.keys) && entry.keys.length ? entry.keys.join(', ') : 'Sin claves'}`);
+            entryParts.push(`Estado: ${entry.enabled === false ? 'Desactivada' : 'Activada'}`);
+            if (entry.comment) entryParts.push(`Comentario: ${entry.comment}`);
+            if (entry.content) entryParts.push('', entry.content);
+            bookParts.push(entryParts.join('\n'));
+        });
+
+        sections.push(`=== LOREBOOK ===\n${bookParts.join('\n\n')}`);
+    }
+
+    if (state.altGreetings.list.length > 0) {
+        sections.push('=== SALUDOS ALTERNATIVOS ===\n' + state.altGreetings.list
+            .map((greeting, index) => `--- SALUDO ${index + 1} ---\n${greeting}`)
+            .join('\n\n'));
+    }
+
+    if (!sections.length) {
+        showToast('No hay contenido para copiar', 'info');
+        return;
+    }
+
+    const success = await copyClip(sections.join('\n\n'));
+    showToast(success ? 'Contenido completo copiado' : 'No se pudo copiar', success ? 'success' : 'error');
 }
 
 export async function exportPng(basePngFile) {
