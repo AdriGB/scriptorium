@@ -4,10 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scriptorium — Creador de Escenarios RPG</title>
+    <meta name="description" content="Editor ligero y offline-first para tarjetas de personaje CharaCard v2 - compatible con PNG y JSON, con boveda IndexedDB y traduccion integrada.">
+    <meta name="theme-color" content="#080912">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Cinzel+Decorative:wght@700&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config={theme:{extend:{colors:{bg:'#080912',bg2:'#0c0e1c',surface:'rgba(16,18,32,0.56)',surface2:'#181b2e',border1:'#252848',border2:'#363a6a',gold:'#c9a84c',gold2:'#e8cc80',goldDim:'#7a6230',violet:'#6d52c4',violet2:'#a07eff',violetDim:'#2d2558',text1:'#ddd5c0',text2:'#a09880',text3:'#847b66',char:'#e8b860',user:'#7ea8e8',editor:'#3ab8a0',editorDim:'#1a4a3e'},fontFamily:{cinzel:['Cinzel','serif'],cinzelDeco:['"Cinzel Decorative"','serif'],crimson:['"Crimson Pro"','serif'],dmMono:['"DM Mono"','monospace']},animation:{'pulse-glow':'pulseGlow 4s ease-in-out infinite','spin-slow':'spin 12s linear infinite','fade-in-up':'fadeInUp 0.4s ease-out forwards'},keyframes:{pulseGlow:{'0%, 100%':{boxShadow:'0 0 14px rgba(201,168,76,0.15),0 0 40px rgba(201,168,76,0.05)'},'50%':{boxShadow:'0 0 22px rgba(201,168,76,0.25),0 0 60px rgba(201,168,76,0.1)'}},fadeInUp:{'0%':{opacity:'0',transform:'translateY(10px)'},'100%':{opacity:'1',transform:'translateY(0)'}}}}}}

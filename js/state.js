@@ -6,6 +6,7 @@ export const STORAGE_KEYS = {
 };
 
 export const VF = { SP: 'system_prompt_global', UP: 'mi_persona' };
+// FIX: VF son virtual fields que no van directo a data
 
 export const TARGET_FIELDS = [
     'description', 'personality', 'scenario', 'first_mes',

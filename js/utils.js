@@ -1,35 +1,52 @@
-// js/utils.js
+// js/utils.js - corregido
 
 import { RESERVED_KEYS } from './state.js';
 
 export const $ = (id) => document.getElementById(id);
 
-export const sanitizeKey = (raw) =>
-    raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_');
+export const sanitizeKey = (raw) => {
+    if (!raw || typeof raw !== 'string') return '';
+    // limite de longitud para evitar keys gigantes
+    return raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 64).replace(/^_+|_+$/g, '');
+};
 
-export const isValidKey = (nk, cur) =>
-    !!nk && nk !== cur && !RESERVED_KEYS.has(nk);
+export const isValidKey = (nk, cur) => {
+    if (!nk) return false;
+    if (nk.length < 2) return false;
+    if (nk === cur) return false;
+    if (RESERVED_KEYS.has(nk.toLowerCase())) return false;
+    return /^[a-z][a-z0-9_]*$/.test(nk);
+};
 
 export const deepClone = (obj) => {
     try { return structuredClone(obj); }
-    catch { return JSON.parse(JSON.stringify(obj)); }
+    catch { 
+        try { return JSON.parse(JSON.stringify(obj)); }
+        catch { return {}; }
+    }
 };
 
 export const countObjFields = (o) => {
     let c = 0;
+    const seen = new WeakSet();
     (function w(x) {
+        if (!x || typeof x !== 'object') return;
+        if (seen.has(x)) return;
+        seen.add(x);
         for (const k in x) {
             if (!Object.prototype.hasOwnProperty.call(x, k)) continue;
-            if (typeof x[k] === 'object' && x[k] !== null) w(x[k]);
-            else if (typeof x[k] === 'string' && x[k].trim()) c++;
+            const v = x[k];
+            if (typeof v === 'object' && v !== null) w(v);
+            else if (typeof v === 'string' && v.trim()) c++;
         }
     })(o);
     return c;
 };
 
 export function setNestedValue(obj, path, value) {
+    if (!obj || typeof obj !== 'object') throw new Error('Objeto invalido');
     const parts = path.split('.');
-    if (parts.some(p => RESERVED_KEYS.has(p.toLowerCase()) || p === '')) {
+    if (parts.some(p => !p || RESERVED_KEYS.has(p.toLowerCase()))) {
         throw new Error('Ruta insegura: ' + path);
     }
     let cur = obj;
@@ -44,17 +61,24 @@ export function setNestedValue(obj, path, value) {
 }
 
 export function deleteNestedValue(obj, path) {
+    if (!obj || typeof obj !== 'object') return false;
     const parts = path.split('.');
-    if (parts.some(p => RESERVED_KEYS.has(p.toLowerCase()) || !p)) return;
+    if (parts.some(p => !p || RESERVED_KEYS.has(p.toLowerCase()))) return false;
     let cur = obj;
     for (let i = 0; i < parts.length - 1; i++) {
         cur = cur?.[parts[i]];
-        if (!cur || typeof cur !== 'object') return;
+        if (!cur || typeof cur !== 'object') return false;
     }
-    delete cur[parts.at(-1)];
+    const last = parts.at(-1);
+    if (last in cur) {
+        delete cur[last];
+        return true;
+    }
+    return false;
 }
 
 export async function copyClip(text) {
+    if (!text) return false;
     let ok = false;
     try {
         if (navigator.clipboard?.writeText) {
@@ -67,7 +91,7 @@ export async function copyClip(text) {
         try {
             ta = document.createElement('textarea');
             ta.value = text;
-            ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0';
+            ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;pointer-events:none';
             document.body.appendChild(ta);
             ta.focus();
             ta.select();
@@ -88,10 +112,16 @@ let toastTm = null;
 export function showToast(msg, type = 'success') {
     const s = TOAST_STYLES[type] || TOAST_STYLES.success;
     const t = $('toast');
-    $('toastIcon').className = 'fa-solid ' + s.icon + ' ' + s.cls;
+    const icon = $('toastIcon');
+    const msgEl = $('toastMsg');
+    if (!t || !icon || !msgEl) {
+        console.log(`[Toast ${type}] ${msg}`);
+        return;
+    }
+    icon.className = 'fa-solid ' + s.icon + ' ' + s.cls;
     for (const st of Object.values(TOAST_STYLES)) t.classList.remove(st.bd);
     t.classList.add(s.bd);
-    $('toastMsg').textContent = msg;
+    msgEl.textContent = msg;
     t.style.opacity = '1';
     t.style.transform = 'translate(-50%,0)';
     if (toastTm) clearTimeout(toastTm);
@@ -102,7 +132,7 @@ export function showToast(msg, type = 'success') {
 }
 
 export function trapFocus(e, el) {
-    if (e.key !== 'Tab') return;
+    if (e.key !== 'Tab' || !el) return;
     const f = el.querySelectorAll(
         'button:not([disabled]),input:not([disabled]),select:not([disabled]),' +
         'textarea:not([disabled]),[tabindex]:not([tabindex="-1"])'
@@ -118,4 +148,11 @@ export function trapFocus(e, el) {
 
 let lastTrigger = null;
 export function saveFocus() { lastTrigger = document.activeElement; }
-export function restoreFocus() { if (lastTrigger) { lastTrigger.focus(); lastTrigger = null; } }
+export function restoreFocus() { 
+    try {
+        if (lastTrigger && typeof lastTrigger.focus === 'function') { 
+            lastTrigger.focus(); 
+        }
+    } catch {}
+    lastTrigger = null; 
+}

@@ -16,3 +16,6 @@ export function copyAll() {
     if (!Object.keys(state.proc.data).length) return;
     copyClip(Object.entries(state.proc.data).map(([k, v]) => '=== ' + k.toUpperCase().replace(/_/g, ' ') + ' ===\n' + v).join('\n\n'));
 }
+
+
+export function exportPngNotImplemented(){ console.warn('PNG export no implementado aun'); }
