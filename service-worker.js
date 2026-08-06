@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'scriptorium-v1.2.2';
+const CACHE_VERSION = 'scriptorium-v1.2.3';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 
 const APP_SHELL = [
@@ -71,34 +71,34 @@ self.addEventListener('fetch', event => {
         return;
     }
 
-    // Navigation: network first, fallback to cache
+    // Navigation: red primero sin modificar la cache versionada. Esto evita
+    // guardar HTML nuevo dentro de una cache perteneciente a un worker viejo.
     if (request.mode === 'navigate') {
         event.respondWith(
-            fetch(request)
-                .then(response => {
-                    const copy = response.clone();
-                    caches.open(APP_CACHE)
-                        .then(cache => cache.put('./index.html', copy));
-                    return response;
-                })
+            fetch(request, { cache: 'no-store' })
                 .catch(() => caches.match('./index.html'))
         );
         return;
     }
 
-    // Same-origin: cache first, fallback to network
-    if (url.origin === self.location.origin) {
+    if (url.origin !== self.location.origin) return;
+
+    // Codigo y manifiesto: red primero, shell precargado como respaldo offline.
+    const isApplicationFile =
+        url.pathname.endsWith('.js') ||
+        url.pathname.endsWith('.css') ||
+        url.pathname.endsWith('.webmanifest');
+
+    if (isApplicationFile) {
         event.respondWith(
-            caches.match(request).then(cached => {
-                if (cached) return cached;
-                return fetch(request).then(response => {
-                    if (!response || !response.ok) return response;
-                    const copy = response.clone();
-                    caches.open(APP_CACHE)
-                        .then(cache => cache.put(request, copy));
-                    return response;
-                });
-            })
+            fetch(request, { cache: 'no-store' })
+                .catch(() => caches.match(request))
         );
+        return;
     }
+
+    // Recursos estaticos versionados: cache primero.
+    event.respondWith(
+        caches.match(request).then(cached => cached || fetch(request))
+    );
 });

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 
 const elements = new Map([
     ['sysPrompt', { value: 'Protege a {{char}} y escucha a {{user}}.' }],
@@ -63,5 +64,14 @@ const withoutGlobalPrompt = buildExp();
 assert.equal(withoutGlobalPrompt.data.system_prompt, undefined);
 await copyAll();
 assert.doesNotMatch(clipboardText, /Prompt obsoleto/);
+
+const serviceWorkerSource = await readFile(new URL('../service-worker.js', import.meta.url), 'utf8');
+const appSource = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+assert.match(serviceWorkerSource, /scriptorium-v1\.2\.3/);
+assert.match(serviceWorkerSource, /fetch\(request, \{ cache: 'no-store' \}\)/);
+assert.doesNotMatch(serviceWorkerSource, /cache\.put\('\.\/index\.html'/);
+assert.match(appSource, /controllerchange/);
+assert.match(appSource, /isLocalDevelopment/);
+assert.match(appSource, /renderJSONSafely\(true\)/);
 
 console.log('Regresiones funcionales: OK');

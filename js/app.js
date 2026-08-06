@@ -44,14 +44,25 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function refreshVisibleJSON() {
         const jsonVisible = !$('jsonView')?.classList.contains('hidden');
-        if (jsonVisible && !state.jsonEditor.dirty) renderJSON();
+        if (jsonVisible && !state.jsonEditor.dirty) renderJSONSafely();
+    }
+
+    function renderJSONSafely(notify = false) {
+        try {
+            renderJSON();
+            return true;
+        } catch (error) {
+            console.error('[JSON] No se pudo renderizar', error);
+            if (notify) showToast('La carta se cargo, pero fallo la vista JSON', 'error');
+            return false;
+        }
     }
 
     if (!fileInput || !dropzone) { console.error('DOM critico no encontrado'); return; }
 
     /* ── Profiles BEFORE vault session ── */
     loadProfiles();
-    renderJSON();
+    renderJSONSafely();
     setWorkspaceLoaded(false);
 
     /* ── Vault init ── */
@@ -133,10 +144,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderRaw();
         if (processBtn) processBtn.disabled = !hasCardContent(count);
         setWorkspaceLoaded(true, name || 'Carta de la boveda', count);
-        renderJSON();
         updLorebookCount();
+        if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
+        else $('tabRaw')?.click();
+        renderJSONSafely(true);
         if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
-        else if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
     });
 
     document.addEventListener('vault:request-card', (e) => {
@@ -206,7 +218,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             const pv = $('processedView');
             if (pv) pv.innerHTML = '<p class="text-text3 italic text-center py-12">No se encontraron campos compatibles.</p>';
             setWorkspaceLoaded(true, fn, count);
-            renderJSON(); updFab(); updLorebookCount();
+            updLorebookCount();
+            $('tabRaw')?.click();
+            renderJSONSafely(true);
+            updFab();
             return setStatus('Tomo vacio: no contiene campos compatibles.', 'error');
         }
         const nm = state.file.uploaded.name || state.file.uploaded.data?.name || state.file.uploaded.char_name || '';
@@ -219,11 +234,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderRaw();
         if (processBtn) processBtn.disabled = !hasContent;
         setWorkspaceLoaded(true, fn, count);
-        renderJSON();
         updLorebookCount();
-        if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
-        else if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
+        if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
         else $('tabRaw')?.click();
+        renderJSONSafely(true);
+        if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
     }
 
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
@@ -324,10 +339,44 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 if ('serviceWorker' in navigator) {
+    const isLocalDevelopment = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    if (!window.__scriptoriumSWRefreshBound) {
+        window.__scriptoriumSWRefreshBound = true;
+        let serviceWorkerRefreshing = false;
+        const hadServiceWorkerController = Boolean(navigator.serviceWorker.controller);
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (!hadServiceWorkerController || serviceWorkerRefreshing) return;
+            serviceWorkerRefreshing = true;
+            window.location.reload();
+        });
+    }
+
     window.addEventListener('load', async () => {
+        if (isLocalDevelopment) {
+            try {
+                const registrations = await navigator.serviceWorker.getRegistrations();
+                await Promise.all(registrations.map(registration => registration.unregister()));
+                if (navigator.serviceWorker.controller && sessionStorage.getItem('scriptorium-local-sw-cleanup') !== '1') {
+                    sessionStorage.setItem('scriptorium-local-sw-cleanup', '1');
+                    window.location.reload();
+                } else {
+                    sessionStorage.removeItem('scriptorium-local-sw-cleanup');
+                }
+            } catch (error) {
+                console.warn('[PWA] No se pudo limpiar el service worker local', error);
+            }
+            return;
+        }
+
         try {
-            const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+            const registration = await navigator.serviceWorker.register('./service-worker.js', {
+                scope: './',
+                updateViaCache: 'none'
+            });
+            await registration.update();
             console.info('[PWA] Service worker registrado:', registration.scope);
-        } catch (error) { console.error('[PWA] No se pudo registrar', error); }
+        } catch (error) {
+            console.error('[PWA] No se pudo registrar', error);
+        }
     });
 }

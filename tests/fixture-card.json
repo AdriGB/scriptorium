@@ -1,0 +1,21 @@
+{
+  "spec": "chara_card_v2",
+  "spec_version": "2.0",
+  "data": {
+    "name": "Prueba Cache",
+    "description": "Descripcion de prueba para verificar la interfaz.",
+    "first_mes": "Hola, {{user}}.",
+    "character_book": {
+      "name": "Mundo de prueba",
+      "entries": [
+        {
+          "keys": ["prueba"],
+          "content": "Entrada de lorebook visible.",
+          "enabled": true,
+          "insertion_order": 0,
+          "extensions": {}
+        }
+      ]
+    }
+  }
+}

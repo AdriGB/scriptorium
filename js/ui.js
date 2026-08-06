@@ -74,7 +74,10 @@ export function setActiveTab(id) {
     $('searchContainer').classList.toggle('hidden', id === 'tabJson' || id === 'tabLorebook');
     $('processedView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
     $('rawView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
-    if (id === 'tabJson' && state.file.uploaded && !state.jsonEditor.dirty) renderJSON();
+    if (id === 'tabJson' && state.file.uploaded && !state.jsonEditor.dirty) {
+        try { renderJSON(); }
+        catch (error) { console.error('[JSON] No se pudo renderizar', error); showToast('No se pudo abrir la vista JSON', 'error'); }
+    }
     if (id === 'tabLorebook') renderLorebook();
     const si = $('searchInput');
     if (si.value && id !== 'tabJson' && id !== 'tabLorebook') si.dispatchEvent(new Event('input'));

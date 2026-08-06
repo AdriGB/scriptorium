@@ -202,7 +202,7 @@
             <div class="flex-1 overflow-y-auto scrollbar-custom p-6 space-y-6 font-crimson text-sm leading-relaxed text-text1">
                 <p class="text-base text-gold2">Editor local y offline-first para tarjetas de personaje.</p>
                 <ul class="grid gap-3 text-text2">
-                    <li class="flex gap-3"><i class="fa-solid fa-tag mt-1 text-goldDim"></i><span><strong class="text-text1">Version 1.2.2</strong><br>Interfaz, exportacion y cache sincronizados.</span></li>
+                    <li class="flex gap-3"><i class="fa-solid fa-tag mt-1 text-goldDim"></i><span><strong class="text-text1">Version 1.2.3</strong><br>Interfaz, exportacion y cache sincronizados.</span></li>
                     <li class="flex gap-3"><i class="fa-solid fa-scroll mt-1 text-goldDim"></i><span><strong class="text-text1">Compatible con CharaCardV2</strong><br>Importa y exporta tarjetas JSON y PNG con metadatos.</span></li>
                     <li class="flex gap-3"><i class="fa-solid fa-laptop mt-1 text-editor"></i><span><strong class="text-text1">Procesamiento local</strong><br>Las cartas y la boveda permanecen en este dispositivo.</span></li>
                     <li class="flex gap-3"><i class="fa-solid fa-language mt-1 text-violet2"></i><span><strong class="text-text1">Traduccion opcional</strong><br>Solo el texto que elijas traducir se envia a Google Translate.</span></li>
@@ -244,6 +244,20 @@
         </div>
     </div>
 
+    <!-- Guard de migracion: se ejecuta desde el HTML nuevo incluso si un
+         service worker anterior intenta entregar app.js desde una cache vieja. -->
+    <script>
+        if ('serviceWorker' in navigator && !window.__scriptoriumSWRefreshBound) {
+            window.__scriptoriumSWRefreshBound = true;
+            let refreshing = false;
+            const hadController = Boolean(navigator.serviceWorker.controller);
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (!hadController || refreshing) return;
+                refreshing = true;
+                window.location.reload();
+            });
+        }
+    </script>
     <script type="module" src="./js/app.js"></script>
 </body>
 </html>
