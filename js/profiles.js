@@ -230,27 +230,34 @@ export async function importProfileFile(file) {
 
 export async function importProfilesBundle(file) {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { showToast('El archivo supera los 5 MB', 'error'); return; }
+    if (file.size > 2 * 1024 * 1024) { showToast('Archivo muy grande', 'error'); return; }
     try {
         const text = await file.text();
         const bundle = JSON.parse(text);
-        if (bundle._format !== 'scriptorium_profiles_bundle' || !Array.isArray(bundle.profiles)) {
-            throw new Error('Formato de bundle no reconocido');
+        if (
+            (bundle._type !== 'scriptorium_profiles_bundle' && bundle._format !== 'scriptorium_profiles_bundle') ||
+            !Array.isArray(bundle.profiles) ||
+            bundle.profiles.length === 0
+        ) {
+            throw new Error('Formato de lote invalido');
         }
+        if (bundle._version !== 1) throw new Error('Version de lote no soportada: ' + (bundle._version || '?'));
         saveD();
         let imported = 0;
+        let firstImportedId = null;
         for (const item of bundle.profiles) {
             try {
                 const validated = validateImportedProfile(item);
                 const id = 'profile_' + (crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`);
                 state.profiles.lib[id] = { id, ...validated };
+                if (!firstImportedId) firstImportedId = id;
                 imported++;
             } catch { continue; }
         }
-        if (imported === 0) throw new Error('No se encontro ningun perfil valido');
-        state.profiles.active = Object.keys(state.profiles.lib).find(k => state.profiles.lib[k].label === bundle.profiles[0]?.label) || Object.keys(state.profiles.lib).pop();
+        if (imported === 0) throw new Error('Ningun perfil valido en el lote');
+        if (firstImportedId) state.profiles.active = firstImportedId;
         savePrf(); renderSel(); applyP();
-        showToast(imported + ' perfil(es) importado(s)');
+        showToast('Lote importado: ' + imported + ' perfil(es)');
     } catch (error) {
         console.error('[Profiles] import bundle', error);
         showToast(error.message || 'No se pudo importar', 'error');
@@ -261,7 +268,7 @@ export function exportAllProfiles() {
     try {
         saveD();
         const bundle = {
-            _format: 'scriptorium_profiles_bundle',
+            _type: 'scriptorium_profiles_bundle',
             _version: 1,
             exportedAt: new Date().toISOString(),
             profileCount: Object.keys(state.profiles.lib).length,

@@ -69,17 +69,35 @@ export function extractFields(obj) {
     }
 
     // Character Book
+    state.characterBook.present = false;
+    state.characterBook.metadata = {};
+
     const bookSrc = dataRoot.character_book ?? obj.character_book;
-    if (bookSrc?.entries && Array.isArray(bookSrc.entries)) {
-        state.characterBook.entries = bookSrc.entries
-            .filter(e => e && typeof e === 'object')
-            .map(e => ({
-                keys: Array.isArray(e.keys) ? e.keys.filter(k => typeof k === 'string') : [],
-                content: String(e.content || ''),
-                enabled: e.enabled !== false,
-                insertion_order: typeof e.insertion_order === 'number' ? e.insertion_order : 0,
-                extensions: e.extensions && typeof e.extensions === 'object' ? JSON.parse(JSON.stringify(e.extensions)) : {}
-            }));
+    if (bookSrc) {
+        state.characterBook.present = true;
+        const { entries: _omitEntries, ...bookMeta } = bookSrc;
+        state.characterBook.metadata = (bookMeta && typeof bookMeta === 'object')
+            ? JSON.parse(JSON.stringify(bookMeta))
+            : {};
+
+        if (bookSrc.entries && Array.isArray(bookSrc.entries)) {
+            state.characterBook.entries = bookSrc.entries
+                .filter(e => e && typeof e === 'object')
+                .map(e => {
+                    const preserved = JSON.parse(JSON.stringify(e));
+                    preserved.keys = Array.isArray(e.keys)
+                        ? e.keys.filter(k => typeof k === 'string')
+                        : [];
+                    preserved.content = String(e.content || '');
+                    preserved.enabled = e.enabled !== false;
+                    preserved.insertion_order = typeof e.insertion_order === 'number'
+                        ? e.insertion_order : 0;
+                    preserved.extensions = (e.extensions && typeof e.extensions === 'object')
+                        ? JSON.parse(JSON.stringify(e.extensions))
+                        : {};
+                    return preserved;
+                });
+        }
     }
 
     // Alternate Greetings
@@ -177,15 +195,18 @@ export function buildExp() {
     }
 
     // Character Book
-    if (state.characterBook.entries.length > 0) {
+    if (state.characterBook.present) {
         card.data.character_book = {
-            entries: state.characterBook.entries.map(e => ({
-                keys: [...e.keys],
-                content: e.content,
-                enabled: e.enabled,
-                insertion_order: e.insertion_order,
-                extensions: JSON.parse(JSON.stringify(e.extensions || {}))
-            }))
+            ...deepClone(state.characterBook.metadata),
+            entries: state.characterBook.entries.map(e => {
+                const preserved = deepClone(e);
+                preserved.keys = [...e.keys];
+                preserved.content = e.content;
+                preserved.enabled = e.enabled;
+                preserved.insertion_order = e.insertion_order;
+                preserved.extensions = deepClone(e.extensions || {});
+                return preserved;
+            })
         };
     }
 

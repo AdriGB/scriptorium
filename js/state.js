@@ -29,7 +29,7 @@ const state = {
     proc: { data: {}, edited: new Set() },
     editor: { active: false, added: new Set(), removed: new Set(), delKey: null, delTm: null },
     jsonEditor: { snap: null, dirty: false, err: null },
-    characterBook: { entries: [] },
+    characterBook: { present: false, metadata: {}, entries: [] },
     altGreetings: { original: '', list: [], current: 0 },
     profiles: {
         active: 'default',

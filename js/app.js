@@ -208,6 +208,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.editor.active = false; state.editor.added.clear(); state.editor.removed.clear();
         state.jsonEditor.snap = null; state.jsonEditor.dirty = false; state.jsonEditor.err = null;
         state.characterBook.entries = [];
+        state.characterBook.present = false; state.characterBook.metadata = {};
         state.altGreetings.original = ''; state.altGreetings.list = []; state.altGreetings.current = 0;
         state.vault.dirty = false;
         $('editorToggle')?.classList.remove('active'); $('editorToggle')?.setAttribute('aria-pressed', 'false');

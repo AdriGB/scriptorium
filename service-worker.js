@@ -1,10 +1,11 @@
-const CACHE_VERSION = 'scriptorium-v1.2.0';
+const CACHE_VERSION = 'scriptorium-v1.2.1';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 
 const APP_SHELL = [
     './',
     './index.html',
     './manifest.webmanifest',
+    './assets/app.css',
 
     './js/app.js',
     './js/chara-card.js',
@@ -59,8 +60,7 @@ self.addEventListener('fetch', event => {
         url.hostname.includes('translate.google.com') ||
         url.hostname.includes('fonts.googleapis.com') ||
         url.hostname.includes('fonts.gstatic.com') ||
-        url.hostname.includes('cdnjs.cloudflare.com') ||
-        url.hostname.includes('cdn.tailwindcss.com')
+        url.hostname.includes('cdnjs.cloudflare.com')
     ) {
         return;
     }

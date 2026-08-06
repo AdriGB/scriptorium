@@ -72,6 +72,8 @@ export function resetCardState() {
     state.jsonEditor.dirty = false;
     state.jsonEditor.err = null;
     state.characterBook.entries = [];
+    state.characterBook.present = false;
+    state.characterBook.metadata = {};
     state.altGreetings.original = '';
     state.altGreetings.list = [];
     state.altGreetings.current = 0;
@@ -575,6 +577,7 @@ export function updLorebookCount() {
 }
 
 export function addLorebookEntry() {
+    state.characterBook.present = true;
     state.characterBook.entries.push({
         keys: [],
         content: '',
