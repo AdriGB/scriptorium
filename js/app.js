@@ -1,6 +1,6 @@
 import state, { getExtracted } from './state.js';
 import { $, showToast, deepClone } from './utils.js';
-import { extractFields } from './chara-card.js';
+import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
 import vault from './storage.js';
 import { openVault } from './vault.js';
@@ -52,6 +52,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.warn('Vault init fallo', e);
     }
 
+    // FIX: guardar sesion para restauracion diferida
+    let savedSession = null;
+
     if (dbReady) {
         vault.startAutoSave(() => state);
         vault.on('session-saved', () => {
@@ -83,6 +86,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (saved.userPersona) userPersonaInput.value = saved.userPersona;
                     processBtn.disabled = false;
                     processText();
+                    // FIX: marcar dirty=false despues de recuperar (no hay cambios nuevos)
+                    state.vault.dirty = false;
+                    // FIX: guardar para restauracion diferida de perfil y editor
+                    savedSession = saved;
                     showToast('Sesion recuperada');
                 } else {
                     await vault.clearSession();
@@ -113,10 +120,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (userNameInput?.value.trim() || sysPromptInput?.value.trim()) processText();
     });
 
-    // FIX CRITICO: faltaba async
-    document.addEventListener('vault:request-card', async (e) => {
+    // FIX: listener sincrono (sin dynamic import ni async)
+    document.addEventListener('vault:request-card', (e) => {
         try {
-            const { buildExp } = await import('./chara-card.js');
             e.detail.card = buildExp();
         } catch (err) {
             console.error('[vault:request-card] error', err);
@@ -127,6 +133,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     /* ── Profiles ── */
     loadProfiles();
     renderJSON();
+
+    // FIX: restaurar perfil y editor DESPUES de loadProfiles
+    if (savedSession) {
+        if (savedSession.activeProfileId && state.profiles.lib[savedSession.activeProfileId]) {
+            state.profiles.active = savedSession.activeProfileId;
+            renderSel();
+            applyP();
+        }
+        if (savedSession.editorActive && !state.editor.active) {
+            togEd();
+        }
+    }
 
     $('saveProfileBtn')?.addEventListener('click', saveCurP);
     $('newProfileBtn')?.addEventListener('click', newPrf);
@@ -218,6 +236,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.jsonEditor.snap = null;
         state.jsonEditor.dirty = false;
         state.jsonEditor.err = null;
+        state.vault.dirty = false;
         $('editorToggle')?.classList.remove('active');
         $('editorToggle')?.setAttribute('aria-pressed', 'false');
         $('editorInfoBar')?.classList.add('hidden');
@@ -284,11 +303,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    /* ── Protect before unload ── */
+    // FIX: beforeunload depende de dirty, no de datos presentes
     window.addEventListener('beforeunload', (e) => {
-        const hasData = Object.keys(state.proc.data).length > 0;
-        const hasFile = state.file.uploaded !== null;
-        if (hasData || hasFile) { e.preventDefault(); e.returnValue = ''; }
+        if (!state.vault.dirty) return;
+        e.preventDefault();
+        e.returnValue = '';
     });
 
     window.addEventListener('beforeunload', () => { vault.stopAutoSave(); });

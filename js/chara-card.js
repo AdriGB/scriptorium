@@ -13,7 +13,6 @@ export function extractFields(obj) {
         if (seenObjects.has(o)) return;
         seenObjects.add(o);
         if (Array.isArray(o)) {
-            // no entramos en arrays para evitar ruido, pero si son de strings los ignoramos
             return;
         }
         for (const k in o) {
@@ -23,7 +22,6 @@ export function extractFields(obj) {
             const lk = k.toLowerCase();
             const v = o[k];
             if (typeof v === 'object' && v !== null) {
-                // evita entrar en extensions aqui, se maneja aparte
                 if (path === '' && k === 'extensions') continue;
                 walk(v, p);
                 continue;
@@ -37,7 +35,6 @@ export function extractFields(obj) {
                     tk = p;
                 }
                 if (state.file.extracted[tk] !== undefined) continue;
-                // solo guardamos si es campo target o contiene placeholders
                 if (TARGET_FIELDS.includes(lk) || v.includes('{{char}}') || v.includes('{{user}}') || p.includes('persona') || p.includes('description')) {
                     state.file.extracted[tk] = v;
                 }
@@ -48,13 +45,12 @@ export function extractFields(obj) {
     const dataRoot = obj.data && typeof obj.data === 'object' ? obj.data : obj;
     walk(dataRoot, '');
 
-    // Si no encontro nada en data, intenta en raiz
     if (Object.keys(state.file.extracted).length === 0 && obj.data !== dataRoot) {
         walk(obj, '');
     }
 
-    // Extraer de extensions.scriptorium
-    const ext = obj.extensions;
+    // FIX: buscar extensions en data.extensions (spec V2) y fallback a raiz
+    const ext = obj.data?.extensions ?? obj.extensions;
     if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
         const scr = ext.scriptorium;
         if (scr && typeof scr === 'object' && scr.fields && typeof scr.fields === 'object') {
@@ -96,8 +92,9 @@ export function buildExp() {
     for (const key of state.editor.removed) {
         try {
             deleteNestedValue(card.data, key);
-            if (card.extensions?.scriptorium?.fields?.[key] !== undefined) {
-                delete card.extensions.scriptorium.fields[key];
+            // FIX: eliminar de data.extensions (spec V2)
+            if (card.data?.extensions?.scriptorium?.fields?.[key] !== undefined) {
+                delete card.data.extensions.scriptorium.fields[key];
             }
         } catch (err) {
             console.warn('remove key fail', key, err);
@@ -117,20 +114,23 @@ export function buildExp() {
         extFields[k] = { value: v, created: state.editor.added.has(k) };
     }
 
+    // FIX: escribir extensions dentro de data (spec V2)
     if (Object.keys(extFields).length > 0) {
-        if (!card.extensions) card.extensions = {};
-        const existing = card.extensions.scriptorium && typeof card.extensions.scriptorium === 'object' ? card.extensions.scriptorium : {};
+        if (!card.data.extensions || typeof card.data.extensions !== 'object' || Array.isArray(card.data.extensions)) {
+            card.data.extensions = {};
+        }
+        const existing = card.data.extensions.scriptorium && typeof card.data.extensions.scriptorium === 'object' ? card.data.extensions.scriptorium : {};
         const existingFields = existing.fields && typeof existing.fields === 'object' ? existing.fields : {};
-        card.extensions.scriptorium = {
+        card.data.extensions.scriptorium = {
             ...existing,
             version: 1,
             fields: { ...existingFields, ...extFields }
         };
     }
 
-    // Limpia extensiones vacias
-    if (card.extensions?.scriptorium?.fields && Object.keys(card.extensions.scriptorium.fields).length === 0) {
-        delete card.extensions.scriptorium.fields;
+    // FIX: limpiar extensions vacias en data
+    if (card.data.extensions?.scriptorium?.fields && Object.keys(card.data.extensions.scriptorium.fields).length === 0) {
+        delete card.data.extensions.scriptorium.fields;
     }
 
     return card;

@@ -22,7 +22,7 @@ function openDB() {
             }
         };
         req.onblocked = () => {
-            console.warn('[Vault] DB blocked - cierra otras pestañas');
+            console.warn('[Vault] DB blocked - cierra otras pestanas');
         };
         req.onsuccess = (e) => resolve(e.target.result);
         req.onerror = (e) => reject(e.target.error);
@@ -111,7 +111,6 @@ export class Vault {
                 userPersona: document.getElementById('userPersona')?.value || '',
                 activeProfileId: state.profiles.active, editorActive: state.editor.active
             };
-            // limit session size to 4MB
             const size = JSON.stringify(snap).length;
             if (size > 4 * 1024 * 1024) {
                 console.warn('[Vault] sesion demasiado grande, no se guarda');
@@ -129,12 +128,16 @@ export class Vault {
     async loadSession() { return this.db ? dbGet(this.db, STORES.SESSIONS, 'current') : null; }
     async clearSession() { if (this.db) await dbDelete(this.db, STORES.SESSIONS, 'current'); }
 
+    // FIX: autosave solo guarda si dirty
     startAutoSave(getStateFn, interval = AUTO_SAVE_MS) {
         this.stopAutoSave();
         this._autoSaveTimer = setInterval(async () => {
             try {
                 const s = getStateFn();
-                if (s && Object.keys(s.proc.data).length > 0) await this.saveSession(s);
+                if (s && s.vault.dirty && Object.keys(s.proc.data).length > 0) {
+                    const saved = await this.saveSession(s);
+                    if (saved) s.vault.dirty = false;
+                }
             } catch (e) { console.warn('autosave', e); }
         }, interval);
     }
@@ -144,10 +147,12 @@ export class Vault {
         if (!this.db) throw new Error('BD no disponible');
         if (!card || typeof card !== 'object') throw new Error('Carta invalida');
         const all = await this.getAllCharacters();
-        if (all.length >= MAX_CHARACTERS) throw new Error(`Boveda llena (${MAX_CHARACTERS} max)`);
 
         const nm = (name || charName || 'Sin nombre').trim().slice(0, 120);
+        // FIX: buscar existing ANTES de verificar limite
         const existing = all.find(c => c.name === nm);
+        if (!existing && all.length >= MAX_CHARACTERS) throw new Error(`Boveda llena (${MAX_CHARACTERS} max)`);
+
         const record = {
             id: existing?.id || genId(), name: nm,
             card: JSON.parse(JSON.stringify(card)),
@@ -195,6 +200,11 @@ export class Vault {
         try { bundle = JSON.parse(text); } catch { throw new Error('JSON no valido'); }
         if (bundle._format !== 'scriptorium_vault') throw new Error('Formato no reconocido - se esperaba scriptorium_vault');
         if (!Array.isArray(bundle.characters)) throw new Error('Sin personajes en bundle');
+
+        // FIX: verificar limite durante importacion
+        const existingAll = await this.getAllCharacters();
+        let currentCount = existingAll.length;
+
         let imported = 0;
         for (const char of bundle.characters) {
             if (!char || typeof char !== 'object') continue;
@@ -203,10 +213,15 @@ export class Vault {
             try {
                 const existing = await this.getCharacter(char.id);
                 if (existing && existing.savedAt >= char.savedAt) continue;
-                // validacion minima
+                // FIX: respetar limite al importar
+                if (!existing && currentCount >= MAX_CHARACTERS) {
+                    console.warn(`[Vault] importacion detenida: boveda llena (${MAX_CHARACTERS})`);
+                    break;
+                }
                 if (!char.name) char.name = 'Importado';
                 await dbPut(this.db, STORES.CHARACTERS, char);
                 imported++;
+                if (!existing) currentCount++;
             } catch (e) { console.warn('import char skip', e); }
         }
         if (bundle.lastSession && typeof bundle.lastSession === 'object') {

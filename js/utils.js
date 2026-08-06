@@ -6,7 +6,6 @@ export const $ = (id) => document.getElementById(id);
 
 export const sanitizeKey = (raw) => {
     if (!raw || typeof raw !== 'string') return '';
-    // limite de longitud para evitar keys gigantes
     return raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 64).replace(/^_+|_+$/g, '');
 };
 
@@ -20,7 +19,7 @@ export const isValidKey = (nk, cur) => {
 
 export const deepClone = (obj) => {
     try { return structuredClone(obj); }
-    catch { 
+    catch {
         try { return JSON.parse(JSON.stringify(obj)); }
         catch { return {}; }
     }
@@ -102,6 +101,35 @@ export async function copyClip(text) {
     return ok;
 }
 
+/* ── Storage wrapper for localStorage ── */
+export const Storage = {
+    get(key, fallback = null) {
+        try {
+            const value = localStorage.getItem(key);
+            return value === null ? fallback : JSON.parse(value);
+        } catch { return fallback; }
+    },
+    set(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+            return true;
+        } catch (error) {
+            if (error.name === 'QuotaExceededError' || error.code === 22) {
+                showToast('Almacenamiento local lleno.', 'error');
+            }
+            return false;
+        }
+    },
+    getBool(key) {
+        try { return localStorage.getItem(key) === '1'; }
+        catch { return false; }
+    },
+    setBool(key, value) {
+        try { localStorage.setItem(key, value ? '1' : '0'); return true; }
+        catch { return false; }
+    }
+};
+
 export const TOAST_STYLES = {
     success: { icon: 'fa-circle-check', cls: 'text-gold', bd: 'border-border2' },
     error:   { icon: 'fa-circle-exclamation', cls: 'text-[#e05a5a]', bd: 'border-[#502020]' },
@@ -148,11 +176,11 @@ export function trapFocus(e, el) {
 
 let lastTrigger = null;
 export function saveFocus() { lastTrigger = document.activeElement; }
-export function restoreFocus() { 
+export function restoreFocus() {
     try {
-        if (lastTrigger && typeof lastTrigger.focus === 'function') { 
-            lastTrigger.focus(); 
+        if (lastTrigger && typeof lastTrigger.focus === 'function') {
+            lastTrigger.focus();
         }
     } catch {}
-    lastTrigger = null; 
+    lastTrigger = null;
 }

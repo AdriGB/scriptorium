@@ -48,7 +48,7 @@ function injectModal() {
           <button id="vaultSaveCurrentBtn" class="font-cinzel text-[0.6rem] tracking-wider uppercase text-bg bg-gold hover:brightness-110 rounded-md px-3 py-1.5 transition-all flex items-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"><i class="fa-solid fa-floppy-disk text-[0.6rem]"></i> Guardar actual</button>
         </div>
         <div id="vaultList" class="flex-1 overflow-y-auto scrollbar-custom p-4 space-y-2 min-h-[200px]"></div>
-        <div class="px-5 py-2.5 border-t border-border1 text-[0.6rem] text-text3 font-crimson italic flex items-center gap-2 shrink-0"><i class="fa-solid fa-hard-drive text-[0.55rem]"></i><span>Guardado en IndexedDB &middot; Los archivos exportados se guardan donde tu decidas</span></div>
+        <div class="px-5 py-2.5 border-t border-border1 text-[0.6rem] text-text3 font-crimson italic flex items-center gap-2 shrink-0"><i class="fa-solid fa-hard-drive text-[0.55rem]"></i><span>Guardado en IndexedDB · Los archivos exportados se guardan donde tu decidas</span></div>
       </div>
     </div>`;
     document.body.appendChild(el.firstElementChild);
@@ -88,12 +88,11 @@ function injectModal() {
         }
     });
 
+    // FIX: sin timeout de 50ms, el listener en app.js es sincrono
     $('vaultSaveCurrentBtn')?.addEventListener('click', async () => {
         try {
             const ev = new CustomEvent('vault:request-card', { detail: {} });
             document.dispatchEvent(ev);
-            // espera un tick para que el listener async llene detail
-            await new Promise(r => setTimeout(r, 50));
             if (!ev.detail?.card) {
                 const { showToast } = await import('./utils.js');
                 showToast('No hay carta para guardar', 'info');
@@ -134,7 +133,7 @@ async function renderList() {
                 <div class="w-9 h-9 rounded-full bg-[radial-gradient(circle_at_50%_60%,rgba(201,168,76,0.15)_0%,transparent_70%)] border border-goldDim/40 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-pen text-goldDim text-xs"></i></div>
                 <div class="flex-1 min-w-0">
                     <div class="font-cinzel text-[0.72rem] tracking-wider uppercase text-text1 truncate">${escapeHtml(char.name)}</div>
-                    <div class="text-[0.6rem] text-text3 font-crimson italic mt-0.5">${fc} campo${fc !== 1 ? 's' : ''} &middot; v${char.version || 1} &middot; ${dateStr} ${timeStr}</div>
+                    <div class="text-[0.6rem] text-text3 font-crimson italic mt-0.5">${fc} campo${fc !== 1 ? 's' : ''} · v${char.version || 1} · ${dateStr} ${timeStr}</div>
                 </div>
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <button class="vault-load-btn w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-gold hover:bg-surface transition-all" title="Cargar" aria-label="Cargar ${escapeHtml(char.name)}"><i class="fa-solid fa-arrow-up-from-bracket text-xs"></i></button>
@@ -159,7 +158,7 @@ async function renderList() {
             });
 
             card.querySelector('.vault-delete-btn')?.addEventListener('click', async () => {
-                if (!confirm(`¿Eliminar "${char.name}" de la boveda?`)) return;
+                if (!confirm(`Eliminar "${char.name}" de la boveda?`)) return;
                 try {
                     await vault.deleteCharacter(char.id);
                     await renderList();

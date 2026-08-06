@@ -1,5 +1,5 @@
-import state, { VF, getExtracted } from './state.js';
-import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, RESERVED_KEYS } from './utils.js';
+import state, { VF, getExtracted, RESERVED_KEYS } from './state.js';
+import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey } from './utils.js';
 import { extractFields, buildExp, findCardByKey } from './chara-card.js';
 import { trText, checkTranslationPrivacy } from './translator.js';
 
@@ -125,6 +125,7 @@ export function createCard(key, text, isRaw) {
         state.proc.data[key] = e.target.innerText;
         cc.textContent = e.target.innerText.length + ' chars';
         state.proc.edited.add(key);
+        state.vault.dirty = true;
         tC = null; tB.classList.add('hidden');
         if (tA) { tA.abort(); tA = null; }
     });
@@ -151,11 +152,11 @@ export function createCard(key, text, isRaw) {
         trB.disabled = true;
         if (tA) tA.abort();
         tA = new AbortController();
-        tX.innerHTML = '<span class="text-violet2 text-xs italic">Traduciendo…</span>';
+        tX.innerHTML = '<span class="text-violet2 text-xs italic">Traduciendo...</span>';
         try {
             tC = await trText(src, 'es', tA.signal, (cur, tot) => {
                 const prog = tX.querySelector('span');
-                if (prog) prog.textContent = tot > 1 ? `Traduciendo fragmento ${cur} de ${tot}…` : 'Traduciendo…';
+                if (prog) prog.textContent = tot > 1 ? `Traduciendo fragmento ${cur} de ${tot}...` : 'Traduciendo...';
             });
             tX.textContent = tC || '(vacio)';
         } catch (err) { if (err.name === 'AbortError') return; tB.classList.add('hidden'); showToast('Error', 'error'); }
@@ -177,6 +178,7 @@ export function createCard(key, text, isRaw) {
                 const res = (o || '').replace(/\{\{char\}\}/gi, () => cn).replace(/\{\{user\}\}/gi, () => un);
                 ce.textContent = res; state.proc.data[key] = res; state.proc.edited.delete(key);
                 cc.textContent = res.length + ' chars'; tC = null; tB.classList.add('hidden');
+                state.vault.dirty = true;
                 if (tA) { tA.abort(); tA = null; }
                 showToast('Restaurado');
             });
@@ -265,12 +267,14 @@ export function movField(key, dir) {
     if (ni < 0 || ni >= e.length) return;
     [e[i], e[ni]] = [e[ni], e[i]];
     state.proc.data = Object.fromEntries(e);
+    state.vault.dirty = true;
     renderProc();
 }
 
 export function addField(key, val) {
     state.proc.data[key] = val;
     state.proc.edited.add(key); state.editor.added.add(key); state.editor.removed.delete(key);
+    state.vault.dirty = true;
     processedCount().textContent = Object.keys(state.proc.data).length;
     renderProc();
 }
@@ -281,6 +285,7 @@ export function deleteField(key) {
     if (state.editor.added.has(key)) state.editor.added.delete(key);
     else state.editor.removed.add(key);
     delete getExtracted()[key];
+    state.vault.dirty = true;
     processedCount().textContent = Object.keys(state.proc.data).length;
     renderProc(); updFab();
     showToast('"' + key + '" eliminado', 'info');
@@ -302,6 +307,7 @@ export function renameField(oldKey, newName) {
     if (state.editor.added.has(oldKey)) { state.editor.added.delete(oldKey); state.editor.added.add(nk); }
     else state.editor.removed.add(oldKey);
     if (getExtracted()[oldKey] !== undefined) { getExtracted()[nk] = getExtracted()[oldKey]; delete getExtracted()[oldKey]; }
+    state.vault.dirty = true;
     renderProc();
     showToast('Renombrado a "' + nk + '"');
 }
@@ -327,6 +333,7 @@ export function processText() {
     }
     for (const ek of state.editor.added) if (prev[ek] !== undefined && state.proc.data[ek] === undefined) state.proc.data[ek] = prev[ek];
     processedCount().textContent = Object.keys(state.proc.data).length;
+    state.vault.dirty = true;
     renderProc();
     $('tabProcessed').click();
     showToast('Ritual completado');
@@ -377,6 +384,7 @@ export function openExp(key, label, cls, isRaw, ce, cc) {
             ce.textContent = v; state.proc.data[key] = v; state.proc.edited.add(key);
             cc.textContent = v.length + ' chars'; $('expandModalCount').textContent = wci(v);
             state.tr.mc = null; $('expandModalTranslation').classList.add('hidden');
+            state.vault.dirty = true;
         };
     }
     $('expandModal').classList.remove('hidden'); $('expandModal').classList.add('flex');
@@ -456,7 +464,7 @@ export function applyJE() {
         const parsed = JSON.parse($('jsonEditorTextarea').value);
         if (Object.keys(state.proc.data).length > 0) {
             const hasEdits = state.proc.edited.size > 0 || state.editor.added.size > 0;
-            if (hasEdits) { if (!confirm('Hay ediciones visuales activas.\n\nAplicar el JSON reemplazará todo el estado actual.\n¿Continuar?')) return; }
+            if (hasEdits) { if (!confirm('Hay ediciones visuales activas.\n\nAplicar el JSON reemplazara todo el estado actual.\nContinuar?')) return; }
         }
         state.file.uploaded = parsed;
         resetCardState();
@@ -469,5 +477,6 @@ export function applyJE() {
         processBtn().disabled = count === 0;
         if (count > 0 && (userNameInput().value.trim() || $('sysPrompt').value.trim())) processText();
         else { updJS(); showToast(count > 0 ? 'Aplicado: ' + count + ' campo(s)' : 'Aplicado', 'info'); }
+        state.vault.dirty = true;
     } catch (err) { showToast('Error: ' + err.message, 'error'); }
 }

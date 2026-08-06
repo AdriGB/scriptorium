@@ -146,12 +146,12 @@ export function initExpandModal() {
         $('expandModalTranslateBtn').disabled = true;
         if (state.tr.ma) state.tr.ma.abort();
         state.tr.ma = new AbortController();
-        tx.innerHTML = '<span class="text-violet2 text-xs italic">Traduciendo…</span>';
+        tx.innerHTML = '<span class="text-violet2 text-xs italic">Traduciendo...</span>';
         const { trText } = await import('./translator.js');
         try {
             state.tr.mc = await trText(src, 'es', state.tr.ma.signal, (cur, tot) => {
                 const prog = tx.querySelector('span');
-                if (prog) prog.textContent = tot > 1 ? `Traduciendo fragmento ${cur} de ${tot}…` : 'Traduciendo…';
+                if (prog) prog.textContent = tot > 1 ? `Traduciendo fragmento ${cur} de ${tot}...` : 'Traduciendo...';
             });
             tx.textContent = state.tr.mc || '(vacio)';
         } catch (err) { if (err.name === 'AbortError') return; tb.classList.add('hidden'); showToast('Error', 'error'); }
@@ -195,6 +195,25 @@ export function initExportModal() {
         a.download = cn.replace(/[^a-z0-9_\-]/gi, '_') + '_card.json';
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         showToast('Descargado');
+    });
+
+    // FIX: PNG export listeners
+    $('exportPngInput')?.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        const nameEl = $('exportPngName');
+        const btnEl = $('exportDownloadPng');
+        if (file) {
+            if (nameEl) nameEl.textContent = file.name;
+            if (btnEl) btnEl.disabled = false;
+        } else {
+            if (nameEl) nameEl.textContent = '';
+            if (btnEl) btnEl.disabled = true;
+        }
+    });
+    $('exportDownloadPng')?.addEventListener('click', async () => {
+        const { exportPng } = await import('./export.js');
+        const file = $('exportPngInput')?.files?.[0];
+        await exportPng(file);
     });
 }
 
