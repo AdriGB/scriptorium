@@ -137,3 +137,156 @@ export function updLbl() {
         if (o) o.textContent = v;
     }
 }
+
+/* ─── Profile file export/import ─── */
+
+function sanitizeFilename(value) {
+    return String(value || 'aventurero')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9_-]+/gi, '_')
+        .replace(/^_+|_+$/g, '')
+        .slice(0, 80) || 'aventurero';
+}
+
+function getCurrentProfileSnapshot() {
+    saveD();
+    const profile = state.profiles.lib[state.profiles.active];
+    if (!profile) throw new Error('No hay un perfil activo');
+    return {
+        id: profile.id,
+        label: profile.label || 'Aventurero',
+        name: profile.name || '',
+        persona: profile.persona || '',
+        sp: profile.sp || ''
+    };
+}
+
+export function exportCurrentProfile() {
+    try {
+        const profile = getCurrentProfileSnapshot();
+        const documentData = {
+            _format: 'scriptorium_profile',
+            _version: 1,
+            exportedAt: new Date().toISOString(),
+            profile
+        };
+        const blob = new Blob(
+            [JSON.stringify(documentData, null, 2)],
+            { type: 'application/json' }
+        );
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = sanitizeFilename(profile.label) + '.scriptorium-profile';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast('Perfil "' + profile.label + '" exportado');
+    } catch (error) {
+        console.error('[Profiles] export', error);
+        showToast('No se pudo exportar el perfil', 'error');
+    }
+}
+
+function validateImportedProfile(value) {
+    if (!value || typeof value !== 'object') throw new Error('Perfil invalido');
+    const label = String(value.label || '').trim().slice(0, 120);
+    const name = String(value.name || '').trim().slice(0, 200);
+    const persona = String(value.persona || '');
+    const sp = String(value.sp || '');
+    if (!label) throw new Error('El perfil no tiene nombre');
+    if (persona.length > 500_000 || sp.length > 500_000) throw new Error('El perfil es demasiado grande');
+    return { label, name, persona, sp };
+}
+
+export async function importProfileFile(file) {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) { showToast('El archivo supera los 2 MB', 'error'); return; }
+    try {
+        const text = await file.text();
+        const documentData = JSON.parse(text);
+        if (documentData._format !== 'scriptorium_profile' || documentData._version !== 1) {
+            throw new Error('Formato de perfil no reconocido');
+        }
+        const imported = validateImportedProfile(documentData.profile);
+        saveD();
+        const id = 'profile_' + (crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`);
+        state.profiles.lib[id] = { id, ...imported };
+        state.profiles.active = id;
+        savePrf(); renderSel(); applyP();
+        showToast('Perfil "' + imported.label + '" importado');
+    } catch (error) {
+        console.error('[Profiles] import', error);
+        showToast(
+            error instanceof SyntaxError
+                ? 'El archivo no contiene JSON valido'
+                : error.message || 'No se pudo importar',
+            'error'
+        );
+    }
+}
+
+export async function importProfilesBundle(file) {
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { showToast('El archivo supera los 5 MB', 'error'); return; }
+    try {
+        const text = await file.text();
+        const bundle = JSON.parse(text);
+        if (bundle._format !== 'scriptorium_profiles_bundle' || !Array.isArray(bundle.profiles)) {
+            throw new Error('Formato de bundle no reconocido');
+        }
+        saveD();
+        let imported = 0;
+        for (const item of bundle.profiles) {
+            try {
+                const validated = validateImportedProfile(item);
+                const id = 'profile_' + (crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`);
+                state.profiles.lib[id] = { id, ...validated };
+                imported++;
+            } catch { continue; }
+        }
+        if (imported === 0) throw new Error('No se encontro ningun perfil valido');
+        state.profiles.active = Object.keys(state.profiles.lib).find(k => state.profiles.lib[k].label === bundle.profiles[0]?.label) || Object.keys(state.profiles.lib).pop();
+        savePrf(); renderSel(); applyP();
+        showToast(imported + ' perfil(es) importado(s)');
+    } catch (error) {
+        console.error('[Profiles] import bundle', error);
+        showToast(error.message || 'No se pudo importar', 'error');
+    }
+}
+
+export function exportAllProfiles() {
+    try {
+        saveD();
+        const bundle = {
+            _format: 'scriptorium_profiles_bundle',
+            _version: 1,
+            exportedAt: new Date().toISOString(),
+            profileCount: Object.keys(state.profiles.lib).length,
+            profiles: Object.values(state.profiles.lib).map(p => ({
+                label: p.label || 'Aventurero',
+                name: p.name || '',
+                persona: p.persona || '',
+                sp: p.sp || ''
+            }))
+        };
+        const blob = new Blob(
+            [JSON.stringify(bundle, null, 2)],
+            { type: 'application/json' }
+        );
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = 'scriptorium_perfiles.scriptorium-profiles';
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        showToast(bundle.profileCount + ' perfil(es) exportado(s)');
+    } catch (error) {
+        console.error('[Profiles] export all', error);
+        showToast('No se pudieron exportar los perfiles', 'error');
+    }
+}

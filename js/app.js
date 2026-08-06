@@ -4,7 +4,7 @@ import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
 import vault from './storage.js';
 import { openVault } from './vault.js';
-import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel } from './profiles.js';
+import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel, exportCurrentProfile, importProfileFile, exportAllProfiles, importProfilesBundle } from './profiles.js';
 import { processText, renderRaw, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF } from './editor.js';
 import { openExpModal, closeExpModal, copyAll } from './export.js';
 import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor } from './ui.js';
@@ -149,6 +149,22 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('deleteProfileBtn')?.addEventListener('click', delCurP);
     $('profileSelect')?.addEventListener('change', chgP);
     $('profileLabelInput')?.addEventListener('input', updLbl);
+
+    /* ── Profile file I/O ── */
+    $('exportProfileBtn')?.addEventListener('click', exportCurrentProfile);
+    $('importProfileBtn')?.addEventListener('click', () => { $('importProfileInput')?.click(); });
+    $('importProfileInput')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (file) await importProfileFile(file);
+        e.target.value = '';
+    });
+    $('exportAllProfilesBtn')?.addEventListener('click', exportAllProfiles);
+    $('importProfilesBundleBtn')?.addEventListener('click', () => { $('importProfilesBundleInput')?.click(); });
+    $('importProfilesBundleInput')?.addEventListener('change', async (e) => {
+        const file = e.target.files?.[0];
+        if (file) await importProfilesBundle(file);
+        e.target.value = '';
+    });
 
     // Config inputs mark dirty + update labels
     charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
@@ -326,3 +342,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     window.addEventListener('beforeunload', () => { vault.stopAutoSave(); });
 });
+
+/* ── PWA Service Worker Registration ── */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('./service-worker.js', { scope: './' });
+            console.info('[PWA] Service worker registrado:', registration.scope);
+        } catch (error) {
+            console.error('[PWA] No se pudo registrar', error);
+        }
+    });
+}
