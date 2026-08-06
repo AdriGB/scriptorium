@@ -69,15 +69,16 @@
             <div>
                 <div class="flex items-center gap-2">
                     <h1 class="font-cinzelDeco text-xl text-gold tracking-wide leading-none text-shadow-glow">Scriptorium</h1>
-                    <button id="aboutBtn" type="button" title="Ver valoración y notas de arquitectura" class="text-[0.6rem] font-cinzel text-goldDim hover:text-gold bg-surface2/60 border border-goldDim/30 hover:border-goldDim/60 rounded-full px-2 py-0.5 transition-all flex items-center gap-1">
-                        <i class="fa-solid fa-award text-[0.65rem] text-gold"></i>
-                        <span>v1.0</span>
-                    </button>
+                    <button id="aboutBtn" type="button" title="Ver valoración y notas de arquitectura" class="text-[0.6rem] font-cinzel text-goldDim hover:text-gold bg-surface2/60 border border-goldDim/30 hover:border-goldDim/60 rounded-full px-2 py-0.5 transition-all flex items-center gap-1"><i class="fa-solid fa-award text-[0.65rem] text-gold"></i><span>v1.1</span></button>
+                    <button id="vaultBtn" type="button" title="Abrir bóveda de personajes" class="text-[0.6rem] font-cinzel text-goldDim hover:text-gold bg-surface2/60 border border-goldDim/30 hover:border-goldDim/60 rounded-full px-2 py-0.5 transition-all flex items-center gap-1"><i class="fa-solid fa-box-archive text-[0.65rem] text-gold"></i><span>Bóveda</span></button>
                 </div>
                 <p class="text-[0.7rem] text-text3 font-cinzel tracking-[0.15em] uppercase mt-1">Creador de Escenarios RPG</p>
             </div>
         </div>
-        <span class="font-cinzel text-[0.65rem] tracking-wider flex items-center gap-2 px-3 py-1.5 border border-border1 rounded-full bg-surface2 text-user border-user/30 transition-colors"><i class="fa-solid fa-hard-drive"></i> Guardado Local</span>
+        <div class="flex items-center gap-3">
+            <span id="vaultStatus" class="font-cinzel text-[0.65rem] tracking-wider flex items-center gap-2 px-3 py-1.5 border border-border1 rounded-full bg-surface2 text-text3 transition-colors cursor-pointer hover:border-goldDim" title="Clic para abrir bóveda"><i class="fa-solid fa-hard-drive"></i><span id="vaultStatusText">Bóveda lista</span></span>
+            <span class="font-cinzel text-[0.65rem] tracking-wider flex items-center gap-2 px-3 py-1.5 border border-border1 rounded-full bg-surface2 text-user border-user/30"><i class="fa-solid fa-laptop"></i> Procesado Local</span>
+        </div>
     </header>
     <main class="relative z-10 flex-1 flex flex-col md:flex-row md:overflow-hidden overflow-y-auto">
         <aside id="leftPanel" class="w-full md:w-[340px] flex-shrink-0 border-b md:border-b-0 md:border-r border-border1 bg-gradient-to-b from-bg2 to-bg flex flex-col md:overflow-y-auto scrollbar-custom p-6 space-y-8 relative z-20">
@@ -102,6 +103,7 @@
                 <div class="text-center text-[0.65rem] text-text3 font-cinzel tracking-widest mt-2">Atajo: <kbd class="bg-surface2 border border-border2 rounded px-1 font-mono text-[0.6rem]">Ctrl</kbd> + <kbd class="bg-surface2 border border-border2 rounded px-1 font-mono text-[0.6rem]">&#8629;</kbd></div>
                 <button id="clearBtn" class="w-full mt-4 bg-transparent border border-border1 text-text3 hover:text-text2 hover:border-border2 hover:bg-surface2 active:scale-[0.98] transition-all rounded-lg py-2 font-cinzel text-[0.65rem] tracking-[0.12em] uppercase flex items-center justify-center gap-2"><i class="fa-solid fa-broom"></i> Limpiar Todo</button>
             </section>
+            <div class="text-[0.58rem] text-text3/50 font-crimson italic text-center px-2 pb-2 leading-snug"><i class="fa-solid fa-lock text-[0.5rem] mr-1"></i> Los archivos se procesan localmente. La traducci&oacute;n env&iacute;a texto a Google Translate.</div>
         </aside>
         <section class="flex-1 flex flex-col bg-bg overflow-hidden relative min-h-[60vh] md:min-h-0">
             <div class="flex items-center px-2 md:px-6 border-b border-border1 bg-[#0c0d1e] shrink-0 overflow-x-auto scrollbar-custom" role="tablist">
@@ -132,346 +134,42 @@
         </section>
     </main>
     <div id="toast" role="status" aria-live="polite" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#1a1c2e] border border-border2 text-text1 px-5 py-2.5 rounded-full font-crimson italic text-sm flex items-center gap-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.6)] opacity-0 translate-y-4 pointer-events-none transition-all duration-300 z-50"><i id="toastIcon" class="fa-solid fa-circle-check text-gold"></i><span id="toastMsg"></span></div>
-    
-    <!-- About / Architecture Modal -->
+    <!-- About Modal -->
     <div id="aboutModal" role="dialog" aria-modal="true" class="fixed inset-0 z-[65] hidden items-center justify-center p-4">
         <div id="aboutBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
         <div class="relative bg-surface border border-border2 rounded-xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-fade-in-up">
             <div class="flex items-center gap-3 px-5 py-3.5 border-b border-border1 bg-gradient-to-r from-[#1b1733] to-[#121024] rounded-t-xl shrink-0">
                 <i class="fa-solid fa-award text-gold text-sm"></i>
-                <h3 class="font-cinzel text-xs tracking-widest uppercase text-gold flex-1">Valoración y Arquitectura</h3>
+                <h3 class="font-cinzel text-xs tracking-widest uppercase text-gold flex-1">Valoraci&oacute;n y Arquitectura</h3>
                 <button id="aboutClose" class="text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
             </div>
             <div class="flex-1 overflow-y-auto scrollbar-custom p-6 space-y-6 font-crimson text-sm leading-relaxed text-text1">
-                <p class="text-base italic text-gold2">"Esta versión se siente como una versión madura, no solo una colección de funciones. Lo mejor es un cambio de filosofía: en lugar de seguir acumulando excepciones, Scriptorium tiene un formato propio."</p>
+                <p class="text-base italic text-gold2">"Esta versi&oacute;n se siente como una versi&oacute;n madura, no solo una colecci&oacute;n de funciones."</p>
                 <div class="space-y-3">
                     <h4 class="font-cinzel text-xs uppercase tracking-wider text-gold flex items-center gap-2"><i class="fa-solid fa-star text-[0.65rem]"></i> Puntos Fuertes</h4>
                     <ul class="space-y-2 list-disc list-inside text-text2 pl-1">
-                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">extensions.scriptorium.fields:</strong> Mantiene los datos estructurados limpios sin mezclar notas humanas en <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">creator_notes</code>.</li>
-                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">Compatibilidad Hacia Atrás:</strong> <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">extractFields()</code> extrae el formato previo manteniendo soporte completo.</li>
-                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">Exportación Limpia:</strong> Flujo robusto para eliminar rutas, aplicar nuevos valores y exportar sin datos residuales.</li>
-                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">Estado Organizado:</strong> Separación clara en <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">state.file</code>, <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">state.proc</code>, <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">state.editor</code>, <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">state.profiles</code>, etc.</li>
+                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">extensions.scriptorium.fields:</strong> Mantiene los datos estructurados limpios.</li>
+                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">Compatibilidad Hacia Atr&aacute;s:</strong> <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">extractFields()</code> extrae el formato previo.</li>
+                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">B&oacute;veda de Personajes:</strong> Guardado en IndexedDB con exportaci&oacute;n como archivo local.</li>
+                        <li><strong class="text-text1 font-cinzel text-[0.75rem] uppercase">Arquitectura Modular:</strong> Separaci&oacute;n en m&oacute;dulos ES con responsabilidades claras.</li>
                     </ul>
                 </div>
-                <div class="space-y-2 border-t border-border1 pt-4">
-                    <h4 class="font-cinzel text-xs uppercase tracking-wider text-gold flex items-center gap-2"><i class="fa-solid fa-layer-group text-[0.65rem]"></i> Versionado de Esquema Integrado</h4>
-                    <p class="text-text2">
-                        Se ha añadido el indicador de versión <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">version: 1</code> dentro de <code class="bg-surface2 px-1 py-0.5 rounded text-xs font-mono">extensions.scriptorium</code> para asegurar migraciones limpias en el futuro sin romper compatibilidad.
-                    </p>
-                </div>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center">
-                        <div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Arquitectura</div>
-                        <div class="text-lg font-cinzel font-bold text-gold mt-1">9.5 / 10</div>
-                    </div>
-                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center">
-                        <div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Interfaz</div>
-                        <div class="text-lg font-cinzel font-bold text-gold mt-1">9 / 10</div>
-                    </div>
-                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center">
-                        <div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Robustez</div>
-                        <div class="text-lg font-cinzel font-bold text-gold mt-1">9 / 10</div>
-                    </div>
-                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center">
-                        <div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Experiencia</div>
-                        <div class="text-lg font-cinzel font-bold text-gold mt-1">9 / 10</div>
-                    </div>
+                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center"><div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Arquitectura</div><div class="text-lg font-cinzel font-bold text-gold mt-1">9.5 / 10</div></div>
+                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center"><div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Interfaz</div><div class="text-lg font-cinzel font-bold text-gold mt-1">9 / 10</div></div>
+                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center"><div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Robustez</div><div class="text-lg font-cinzel font-bold text-gold mt-1">9 / 10</div></div>
+                    <div class="bg-surface2/60 border border-border1 rounded-lg p-3 text-center"><div class="text-xs font-cinzel text-text3 uppercase tracking-wider">Experiencia</div><div class="text-lg font-cinzel font-bold text-gold mt-1">9 / 10</div></div>
                 </div>
             </div>
         </div>
     </div>
-
+    <!-- Expand Modal -->
     <div id="expandModal" role="dialog" aria-modal="true" class="fixed inset-0 z-[60] hidden items-center justify-center p-4 md:p-10"><div id="expandModalBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div><div class="relative bg-surface border border-border2 rounded-xl w-full max-w-3xl max-h-full flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-fade-in-up"><div class="flex items-center gap-3 px-5 py-3.5 border-b border-border1 bg-gradient-to-r from-[#12142a] to-[#0e1025] rounded-t-xl shrink-0"><i id="expandModalIcon" class="fa-solid fa-bookmark text-goldDim"></i><h3 id="expandModalTitle" class="font-cinzel text-xs tracking-widest uppercase text-gold flex-1 truncate"></h3><span id="expandModalCount" class="text-[0.65rem] text-text3 font-crimson italic"></span><button id="expandModalTranslateBtn" class="font-cinzel text-[0.6rem] tracking-[0.12em] uppercase text-text3 hover:text-violet2 bg-transparent hover:bg-surface2 border border-border1 hover:border-violetDim rounded-md px-2.5 py-1 transition-all"><i class="fa-solid fa-language"></i> Traducir</button><button id="expandModalClose" class="text-text3 hover:text-text1 transition-colors ml-1"><i class="fa-solid fa-xmark text-lg"></i></button></div><div class="overflow-y-auto scrollbar-custom p-6"><div id="expandModalContent" class="font-crimson text-base text-text1 whitespace-pre-wrap leading-[1.8] outline-none min-h-[30vh]"></div><div id="expandModalTranslation" class="hidden mt-5 pt-4 border-t border-dashed border-violetDim/50"><p class="text-[0.6rem] font-cinzel tracking-widest uppercase text-violet2 mb-2"><i class="fa-solid fa-language"></i> Traduccion de referencia</p><div id="expandModalTranslationText" class="font-crimson text-lg text-text2 italic whitespace-pre-wrap leading-[1.8]"></div></div></div><div class="px-5 py-3 border-t border-border1 text-[0.65rem] text-text3 italic font-crimson shrink-0" id="expandModalHint"></div></div></div>
+    <!-- Add Field Modal -->
     <div id="addFieldModal" role="dialog" aria-modal="true" class="fixed inset-0 z-[65] hidden items-center justify-center p-4"><div id="addFieldBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div><div class="relative bg-surface border border-border2 rounded-xl w-full max-w-lg shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-fade-in-up"><div class="flex items-center gap-3 px-5 py-3.5 border-b border-border1 bg-gradient-to-r from-[#0e2a24] to-[#0a1e1a] rounded-t-xl"><i class="fa-solid fa-plus-circle text-editor text-sm"></i><h3 class="font-cinzel text-xs tracking-widest uppercase text-editor flex-1">Agregar Campo</h3><button id="addFieldClose" class="text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button></div><div class="p-5 space-y-4"><div><label class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 mb-1.5 block">Tipo</label><select id="addFieldPreset" class="themed-select w-full bg-bg2 border border-border1 rounded-lg pl-2.5 pr-8 py-2 text-text1 text-xs outline-none hover:border-border2 focus:border-editor cursor-pointer font-crimson"><option value="">&mdash; Seleccionar &mdash;</option><option value="description">Descripcion</option><option value="personality">Personalidad</option><option value="scenario">Escenario</option><option value="first_mes">Saludo</option><option value="mes_example">Dialogo</option><option value="system_prompt">System Prompt</option><option value="custom">&#10022; Personalizado</option></select></div><div><label for="addFieldKey" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 mb-1.5 block">Nombre / Clave</label><input type="text" id="addFieldKey" class="w-full bg-bg2 border border-border1 rounded-lg px-3 py-2 text-text1 text-xs outline-none focus:border-editor placeholder:text-text3/50 placeholder:italic font-mono" placeholder="mi_campo"></div><div><label for="addFieldValue" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 mb-1.5 block">Contenido</label><textarea id="addFieldValue" class="w-full bg-bg2 border border-border1 rounded-lg px-3 py-2.5 text-text1 text-sm outline-none focus:border-editor placeholder:text-text3/50 placeholder:italic resize-y min-h-[120px]" placeholder="Contenido..."></textarea></div><div id="addFieldError" class="hidden text-[0.75rem] text-[#e05a5a] italic"></div></div><div class="flex items-center justify-end gap-3 px-5 py-3.5 border-t border-border1"><button id="addFieldCancel" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 hover:text-text1 border border-border1 hover:border-border2 rounded-lg px-4 py-2 transition-all">Cancelar</button><button id="addFieldConfirm" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-bg bg-editor hover:brightness-110 rounded-lg px-5 py-2 transition-all"><i class="fa-solid fa-plus text-[0.6rem]"></i> Agregar</button></div></div></div>
+    <!-- Export Modal -->
     <div id="exportModal" role="dialog" aria-modal="true" class="fixed inset-0 z-[65] hidden items-center justify-center p-4"><div id="exportBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div><div class="relative bg-surface border border-border2 rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-fade-in-up"><div class="flex items-center gap-3 px-5 py-3.5 border-b border-border1 bg-gradient-to-r from-[#0e2a24] to-[#0a1e1a] rounded-t-xl shrink-0"><i class="fa-solid fa-file-export text-editor text-sm"></i><h3 class="font-cinzel text-xs tracking-widest uppercase text-editor flex-1">Exportar Tarjeta</h3><button id="exportClose" class="text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button></div><div class="flex-1 overflow-hidden p-5"><p class="text-[0.72rem] text-text3 italic mb-3 font-crimson">JSON formateado (chara_card_v2).</p><textarea id="exportJsonPreview" readonly class="w-full h-full min-h-[300px] bg-bg2 border border-border1 rounded-lg px-4 py-3 text-text1 font-mono text-xs leading-relaxed outline-none resize-none scrollbar-custom"></textarea></div><div class="flex items-center justify-end gap-3 px-5 py-3.5 border-t border-border1 shrink-0"><button id="exportCopyJson" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 hover:text-text1 border border-border1 hover:border-border2 rounded-lg px-4 py-2 transition-all"><i class="fa-regular fa-copy"></i> Copiar</button><button id="exportDownload" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-bg bg-editor hover:brightness-110 rounded-lg px-5 py-2 transition-all"><i class="fa-solid fa-download"></i> Descargar</button></div></div></div>
 
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-
-const STORAGE_KEYS={SIDEBAR:'scriptorium_sidebar_collapsed',PROFILES:'scriptorium_profiles',PROFILES_LEGACY:'scriptorium_profile'};
-const VF={SP:'system_prompt_global',UP:'mi_persona'};
-const TARGET_FIELDS=['description','personality','scenario','first_mes','mes_example','system_prompt','post_history_instructions','greeting','char_greeting','world_scenario','example_dialogue'];
-const V2_DATA_FIELDS=new Set(['description','personality','scenario','first_mes','mes_example','system_prompt','post_history_instructions','creator_notes','tags','creator','character_version']);
-const TOAST_STYLES={success:{icon:'fa-circle-check',cls:'text-gold',bd:'border-border2'},error:{icon:'fa-circle-exclamation',cls:'text-[#e05a5a]',bd:'border-[#502020]'},info:{icon:'fa-circle-info',cls:'text-user',bd:'border-border2'}};
-const RESERVED_KEYS=new Set(['__proto__','constructor','prototype','tostring','valueof','hasownproperty']);
-
-const $=id=>document.getElementById(id);
-const sanitizeKey=raw=>raw.trim().toLowerCase().replace(/[^a-z0-9_]/g,'_');
-const isValidKey=(nk,cur)=>!!nk&&nk!==cur&&!RESERVED_KEYS.has(nk);
-const deepClone=obj=>{try{return structuredClone(obj)}catch{return JSON.parse(JSON.stringify(obj))}};
-const countObjFields=o=>{let c=0;(function w(x){for(const k in x){if(!Object.prototype.hasOwnProperty.call(x,k))continue;if(typeof x[k]==='object'&&x[k]!==null)w(x[k]);else if(typeof x[k]==='string'&&x[k].trim())c++}})(o);return c};
-
-const state={
-    file:{uploaded:null,extracted:{}},
-    proc:{data:{},edited:new Set()},
-    editor:{active:false,added:new Set(),removed:new Set(),delKey:null,delTm:null},
-    jsonEditor:{snap:null,dirty:false,err:null},
-    profiles:{active:'default',lib:{'default':{id:'default',label:'Perfil Inicial',name:'',persona:'',sp:''}}},
-    ui:{dCnf:false,dTm:null},
-    canvas:{run:true},
-    tr:{mc:null,ma:null}
-};
-let lastTrigger=null;
-const getExtracted=()=>state.file.extracted;
-
-function setNestedValue(obj,path,value){const parts=path.split('.');if(parts.some(p=>RESERVED_KEYS.has(p.toLowerCase())||p==='')){throw new Error('Ruta insegura: '+path)}let cur=obj;for(let i=0;i<parts.length-1;i++){const p=parts[i];if(cur[p]===undefined||cur[p]===null||typeof cur[p]!=='object'||Array.isArray(cur[p]))cur[p]={};cur=cur[p]}cur[parts[parts.length-1]]=value}
-
-function deleteNestedValue(obj,path){const parts=path.split('.');if(parts.some(p=>RESERVED_KEYS.has(p.toLowerCase())||!p))return;let cur=obj;for(let i=0;i<parts.length-1;i++){cur=cur?.[parts[i]];if(!cur||typeof cur!=='object')return}delete cur[parts.at(-1)]}
-
-/* extractFields: extracts standard + custom fields from extensions.scriptorium.fields */
-function extractFields(obj){
-    state.file.extracted={};let dup=0;
-    function walk(o,path){
-        path=path||'';
-        for(const k in o){
-            if(!Object.prototype.hasOwnProperty.call(o,k))continue;
-            if(RESERVED_KEYS.has(k.toLowerCase()))continue;
-            const p=path?path+'.'+k:k,lk=k.toLowerCase();
-            if(typeof o[k]==='object'&&o[k]!==null){walk(o[k],p);continue}
-            if(typeof o[k]==='string'&&o[k].trim()){
-                let tk;
-                if(TARGET_FIELDS.includes(lk)){if(state.file.extracted[k]===undefined)tk=k;else{tk=p;dup++}}else tk=p;
-                if(state.file.extracted[tk]!==undefined)continue;
-                if(TARGET_FIELDS.includes(lk)||o[k].includes('{{char}}')||o[k].includes('{{user}}'))state.file.extracted[tk]=o[k];
-            }
-        }
-    }
-    walk(obj.data&&typeof obj.data==='object'?obj.data:obj);
-
-    /* Extract custom fields from extensions.scriptorium.fields with versioning support */
-    const ext=obj.extensions;
-    if(ext&&typeof ext==='object'){
-        const scr=ext.scriptorium;
-        if(scr&&typeof scr==='object'){
-            const ver=scr.version||scr.schema||1; // Supports numeric versioning
-            if(scr.fields&&typeof scr.fields==='object'){
-                for(const[k,v]of Object.entries(scr.fields)){
-                    if(state.file.extracted[k]!==undefined)continue;
-                    let val;
-                    if(typeof v==='object'&&v!==null&&'value'in v)val=v.value;
-                    else if(typeof v==='string')val=v;
-                    else continue;
-                    if(typeof val==='string'&&val.trim())state.file.extracted[k]=val;
-                }
-            }
-        }
-    }
-    return dup;
-}
-
-function findCardByKey(key,view){return[...(view||processedView).querySelectorAll('.field-card')].find(c=>c.dataset.key===key)??null}
-function decodeCharaPayload(raw){const t=raw.trim();try{return JSON.parse(new TextDecoder('utf-8').decode(Uint8Array.from(atob(t),c=>c.charCodeAt(0))))}catch{}return JSON.parse(t)}
-
-const leftPanel=$('leftPanel'),sidebarToggleBtn=$('sidebarToggleBtn'),canvas=$('stars-canvas'),ctx=canvas.getContext('2d');let W,H,stars=[];
-const fileInput=$('dropzone-file'),dropzone=$('dropzone'),uploadStatus=$('uploadStatus');
-const sysPromptInput=$('sysPrompt'),charNameInput=$('charName'),userNameInput=$('userName'),userPersonaInput=$('userPersona');
-const saveProfileBtn=$('saveProfileBtn'),processBtn=$('processBtn'),clearBtn=$('clearBtn');
-const processedView=$('processedView'),rawView=$('rawView'),jsonView=$('jsonView'),tabs=document.querySelectorAll('.tab-btn');
-const processedCount=$('processedCount'),rawCount=$('rawCount');
-const searchInput=$('searchInput'),searchClearBtn=$('searchClearBtn'),searchContainer=$('searchContainer');
-const fabContainer=$('fabContainer'),profileSelect=$('profileSelect');
-const newProfileBtn=$('newProfileBtn'),deleteProfileBtn=$('deleteProfileBtn');
-const profileLabelContainer=$('profileLabelContainer'),profileLabelInput=$('profileLabelInput');
-const editorToggle=$('editorToggle'),editorInfoBar=$('editorInfoBar');
-const aboutBtn=$('aboutBtn'),aboutModal=$('aboutModal'),aboutClose=$('aboutClose'),aboutBackdrop=$('aboutBackdrop');
-
-const Storage={get(k,fb){try{const r=localStorage.getItem(k);return r?JSON.parse(r):fb}catch{return fb}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){if(e.name==='QuotaExceededError'||e.code===22)showToast('Almacenamiento lleno.','error');return false}},getBool(k){try{return localStorage.getItem(k)==='1'}catch{return false}},setBool(k,v){try{localStorage.setItem(k,v?'1':'0')}catch{}}};
-
-function setSidebarCollapsed(c){leftPanel.classList.toggle('panel-collapsed',c);sidebarToggleBtn.classList.toggle('is-collapsed',c);sidebarToggleBtn.setAttribute('aria-expanded',String(!c));sidebarToggleBtn.title=c?'Mostrar':'Ocultar';sidebarToggleBtn.setAttribute('aria-label',sidebarToggleBtn.title);Storage.setBool(STORAGE_KEYS.SIDEBAR,c)}
-sidebarToggleBtn.addEventListener('click',()=>setSidebarCollapsed(!leftPanel.classList.contains('panel-collapsed')));
-if(Storage.getBool(STORAGE_KEYS.SIDEBAR))setSidebarCollapsed(true);
-
-function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight}
-function initC(){resize();stars=Array.from({length:150},()=>({x:Math.random()*W,y:Math.random()*H,r:Math.random()*1.2,a:Math.random(),da:(Math.random()-0.5)*0.008}))}
-function drawS(){if(!state.canvas.run)return;ctx.clearRect(0,0,W,H);stars.forEach(s=>{s.a+=s.da;if(s.a<=0||s.a>=1)s.da*=-1;ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(200,190,255,${Math.max(0,s.a*0.6)})`;ctx.fill()});requestAnimationFrame(drawS)}
-window.addEventListener('resize',resize);document.addEventListener('visibilitychange',()=>{state.canvas.run=!document.hidden;if(state.canvas.run)drawS()});initC();drawS();
-
-let toastTm=null;
-function showToast(msg,type){type=type||'success';const s=TOAST_STYLES[type]||TOAST_STYLES.success,t=$('toast');$('toastIcon').className='fa-solid '+s.icon+' '+s.cls;for(const st of Object.values(TOAST_STYLES))t.classList.remove(st.bd);t.classList.add(s.bd);$('toastMsg').textContent=msg;t.style.opacity='1';t.style.transform='translate(-50%,0)';if(toastTm)clearTimeout(toastTm);toastTm=setTimeout(()=>{t.style.opacity='0';t.style.transform='translate(-50%,1rem)'},3000)}
-function setStatus(msg,type,html){uploadStatus.classList.remove('hidden');uploadStatus.className='mt-3 text-xs p-2.5 rounded-lg text-center italic border '+(type==='error'?'border-[#502020] text-[#e05a5a]':type==='success'?'border-goldDim text-gold':'border-border2 text-user');if(html)uploadStatus.innerHTML=msg;else uploadStatus.textContent=msg}
-function trapFocus(e,el){if(e.key!=='Tab')return;const f=el.querySelectorAll('button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');if(!f.length)return;const a=f[0],z=f[f.length-1];if(e.shiftKey){if(document.activeElement===a){e.preventDefault();z.focus()}}else{if(document.activeElement===z){e.preventDefault();a.focus()}}}
-function restoreFocus(){if(lastTrigger){lastTrigger.focus();lastTrigger=null}}
-
-/* Profiles */
-function loadProfiles(){const s=Storage.get(STORAGE_KEYS.PROFILES);if(s&&typeof s==='object'&&s.profiles&&typeof s.profiles==='object'&&!Array.isArray(s.profiles)){const v={};for(const[k,x]of Object.entries(s.profiles))if(x&&typeof x==='object'&&x.id&&x.label)v[k]=x;if(Object.keys(v).length)state.profiles.lib=v;state.profiles.active=s.activeProfileId||state.profiles.active}else{const l=Storage.get(STORAGE_KEYS.PROFILES_LEGACY);if(l){state.profiles.lib['default']={id:'default',label:'Tomo Inicial',name:l.userName||'',persona:l.userPersona||'',sp:l.sysPrompt||''};savePrf()}}if(!state.profiles.lib[state.profiles.active]){state.profiles.active=Object.keys(state.profiles.lib)[0]||'default';if(!state.profiles.lib[state.profiles.active])state.profiles.lib[state.profiles.active]={id:state.profiles.active,label:'Perfil',name:'',persona:'',sp:''}}renderSel();applyP()}
-function savePrf(){Storage.set(STORAGE_KEYS.PROFILES,{activeProfileId:state.profiles.active,profiles:state.profiles.lib})}
-function renderSel(){profileSelect.innerHTML='';Object.values(state.profiles.lib).forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.label;if(p.id===state.profiles.active)o.selected=true;profileSelect.appendChild(o)});deleteProfileBtn.classList.toggle('hidden',Object.keys(state.profiles.lib).length<=1)}
-function applyP(){const p=state.profiles.lib[state.profiles.active];if(!p)return;userNameInput.value=p.name||'';userPersonaInput.value=p.persona||'';sysPromptInput.value=p.sp||'';profileLabelInput.value=p.label||'';profileLabelContainer.classList.remove('hidden');updLP()}
-function saveCurP(){saveProfileBtn.disabled=true;const o=saveProfileBtn.innerHTML;saveProfileBtn.innerHTML='<i class="fa-solid fa-spinner fa-spin z-10"></i><span class="z-10">Guardando...</span>';setTimeout(()=>{try{const p=state.profiles.lib[state.profiles.active];if(!p)return;p.name=userNameInput.value.trim();p.persona=userPersonaInput.value.trim();p.sp=sysPromptInput.value.trim();const l=profileLabelInput.value.trim();if(l)p.label=l;savePrf();renderSel();showToast('Perfil "'+p.label+'" guardado')}catch{showToast('Error','error')}finally{saveProfileBtn.disabled=false;saveProfileBtn.innerHTML=o}},400)}
-function newPrf(){const n='profile_'+(crypto.randomUUID?.()||Date.now()+'_'+Math.random().toString(36).substr(2,9));state.profiles.lib[n]={id:n,label:'Aventurero '+(Object.keys(state.profiles.lib).length+1),name:'',persona:'',sp:''};saveD();state.profiles.active=n;savePrf();renderSel();applyP();showToast('Perfil forjado')}
-function rstDel(){state.ui.dCnf=false;if(state.ui.dTm){clearTimeout(state.ui.dTm);state.ui.dTm=null}deleteProfileBtn.innerHTML='<i class="fa-solid fa-trash-can text-sm"></i>';deleteProfileBtn.title="Destruir"}
-function delCurP(){if(Object.keys(state.profiles.lib).length<=1){showToast('Ultimo perfil','info');return}if(!state.ui.dCnf){state.ui.dCnf=true;deleteProfileBtn.innerHTML='<i class="fa-solid fa-skull text-red-500 animate-pulse text-sm"></i>';showToast('Pulsa de nuevo');state.ui.dTm=setTimeout(rstDel,3000)}else{clearTimeout(state.ui.dTm);state.ui.dTm=null;state.ui.dCnf=false;deleteProfileBtn.innerHTML='<i class="fa-solid fa-trash-can text-sm"></i>';const l=state.profiles.lib[state.profiles.active]?.label||'';delete state.profiles.lib[state.profiles.active];state.profiles.active=Object.keys(state.profiles.lib)[0];savePrf();renderSel();applyP();showToast('"'+l+'" desintegrado')}}
-function chgP(e){saveD();state.profiles.active=e.target.value;applyP();if(Object.keys(getExtracted()).length>0)processText()}
-function saveD(){const p=state.profiles.lib[state.profiles.active];if(!p)return;p.name=userNameInput.value.trim();p.persona=userPersonaInput.value.trim();p.sp=sysPromptInput.value.trim();const l=profileLabelInput.value.trim();if(l)p.label=l}
-function updLbl(){const p=state.profiles.lib[state.profiles.active],v=profileLabelInput.value.trim();if(p&&v){p.label=v;const o=profileSelect.querySelector('[value="'+state.profiles.active+'"]');if(o)o.textContent=v}}
-function updLP(){const cn=charNameInput.value.trim(),cp=$('charPreview');if(cn){$('charBadge').textContent=cn+' = {{char}}';cp.classList.remove('hidden');cp.classList.add('flex')}else cp.classList.add('hidden');const un=userNameInput.value.trim(),up=$('userPreview');if(un){$('userBadge').textContent=un+' = {{user}}';up.classList.remove('hidden');up.classList.add('flex')}else up.classList.add('hidden')}
-charNameInput.addEventListener('input',updLP);userNameInput.addEventListener('input',updLP);
-saveProfileBtn.addEventListener('click',saveCurP);newProfileBtn.addEventListener('click',newPrf);deleteProfileBtn.addEventListener('click',delCurP);
-profileSelect.addEventListener('change',chgP);profileLabelInput.addEventListener('input',updLbl);
-
-/* File */
-function resetCardState(){clearFDC();state.proc.data={};state.proc.edited.clear();state.editor.added.clear();state.editor.removed.clear();state.file.extracted={};state.jsonEditor.snap=null;state.jsonEditor.dirty=false;state.jsonEditor.err=null}
-async function handleF(file){const j=file.type==='application/json'||file.name.toLowerCase().endsWith('.json'),p=file.type==='image/png'||file.name.toLowerCase().endsWith('.png');if(!j&&!p)return setStatus('Solo JSON o PNG.','error');if(file.size>10*1024*1024)return setStatus('Max 10 MB.','error');setStatus('<i class="fa-solid fa-circle-notch fa-spin"></i> Leyendo...','info',true);try{if(j){const r=new FileReader();r.onload=e=>{try{state.file.uploaded=JSON.parse(e.target.result);finishL(file.name)}catch{setStatus('JSON malformado.','error')}};r.readAsText(file)}else{state.file.uploaded=await extPNG(file);finishL(file.name)}}catch(err){setStatus('Error: '+(err.message||'Sin metadatos.'),'error')}}
-function finishL(fn){resetCardState();const dup=extractFields(state.file.uploaded),count=Object.keys(getExtracted()).length;if(count===0)return setStatus('Tomo vacio.','error');const nm=state.file.uploaded.name||(state.file.uploaded.data&&state.file.uploaded.data.name)||state.file.uploaded.char_name||'';if(nm){charNameInput.value=nm;updLP()}let msg='✓ '+fn+' — '+count+' campo(s).';if(dup>0)msg+=' ('+dup+' dup.)';setStatus(msg,'success');rawCount.textContent=count;renderRaw();processBtn.disabled=false;renderJSON();if(userNameInput.value.trim()||sysPromptInput.value.trim())processText();else $('tabRaw').click()}
-async function extPNG(file){const buf=await file.arrayBuffer(),dv=new DataView(buf),u8=new Uint8Array(buf);if(dv.byteLength<8||dv.getUint32(0)!==0x89504e47||dv.getUint32(4)!==0x0d0a1a0a)throw new Error('PNG invalido');let off=8;while(off+12<=dv.byteLength){const len=dv.getUint32(off);if(off+12+len>dv.byteLength)throw new Error('PNG truncado');const type=String.fromCharCode(u8[off+4],u8[off+5],u8[off+6],u8[off+7]);if(type==='tEXt'){let kw='',val='',ik=true;for(let i=0;i<len;i++){const c=u8[off+8+i];if(c===0&&ik){ik=false;continue}if(ik)kw+=String.fromCharCode(c);else val+=String.fromCharCode(c)}if(kw==='chara')return decodeCharaPayload(val)}else if(type==='zTXt'){let kw='',i=0;while(i<len&&u8[off+8+i]!==0){kw+=String.fromCharCode(u8[off+8+i]);i++}i++;if(kw==='chara'&&i<len){const cm=u8[off+8+i];i++;if(cm===0&&i<len){try{const dec=await decompZ(u8.slice(off+8+i,off+8+len));if(dec)return decodeCharaPayload(new TextDecoder('latin1').decode(dec))}catch{}}}}if(type==='IEND')break;off+=12+len}throw new Error("Sin 'chara'.")}
-async function decompZ(data){if(typeof DecompressionStream==='undefined')return null;try{const ds=new DecompressionStream('deflate');const w=ds.writable.getWriter();w.write(data);w.close();const r=ds.readable.getReader(),ch=[];while(true){const{done,value}=await r.read();if(done)break;ch.push(value)}const t=ch.reduce((s,c)=>s+c.length,0),res=new Uint8Array(t);let o=0;for(const c of ch){res.set(c,o);o+=c.length}return res}catch{return null}}
-dropzone.addEventListener('dragover',e=>{e.preventDefault();dropzone.classList.add('drag-over')});dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('drag-over'));
-dropzone.addEventListener('drop',e=>{e.preventDefault();dropzone.classList.remove('drag-over');if(e.dataTransfer.files[0])handleF(e.dataTransfer.files[0])});
-fileInput.addEventListener('change',e=>{if(e.target.files[0])handleF(e.target.files[0])});
-
-/* Process */
-function processText(){if(!Object.keys(getExtracted()).length&&!sysPromptInput.value.trim())return;const cn=charNameInput.value.trim()||'{{char}}',un=userNameInput.value.trim()||'{{user}}',persona=userPersonaInput.value.trim(),sp=sysPromptInput.value.trim(),cR=/\{\{char\}\}/gi,uR=/\{\{user\}\}/gi;const prev={...state.proc.data};state.proc.data={};if(sp){const k=VF.SP;state.proc.data[k]=state.proc.edited.has(k)&&prev[k]?prev[k]:sp.replace(cR,()=>cn).replace(uR,()=>un)}for(const[k,v]of Object.entries(getExtracted())){state.proc.data[k]=state.proc.edited.has(k)&&prev[k]!==undefined?prev[k]:v.replace(cR,()=>cn).replace(uR,()=>un)}if(persona){const k=VF.UP;state.proc.data[k]=state.proc.edited.has(k)&&prev[k]?prev[k]:persona.replace(cR,()=>cn).replace(uR,()=>un)}for(const ek of state.editor.added)if(prev[ek]!==undefined&&state.proc.data[ek]===undefined)state.proc.data[ek]=prev[ek];processedCount.textContent=Object.keys(state.proc.data).length;renderProc();$('tabProcessed').click();showToast('Ritual completado')}
-processBtn.addEventListener('click',processText);
-function fIcon(k){const l=k.toLowerCase();if(l.includes('description'))return'fa-user-large';if(l.includes('personality'))return'fa-masks-theater';if(l.includes('scenario'))return'fa-mountain-sun';if(l.includes('greeting')||l.includes('first_mes'))return'fa-hand-sparkles';if(l.includes('example'))return'fa-comments';if(l.includes('system_prompt')||k===VF.SP)return'fa-terminal';if(l.includes('post_history'))return'fa-clock-rotate-left';if(k===VF.UP)return'fa-user-shield';return'fa-bookmark'}
-
-function clearFDC(){if(state.editor.delTm){clearTimeout(state.editor.delTm);state.editor.delTm=null}if(state.editor.delKey){const prev=findCardByKey(state.editor.delKey);if(prev){const b=prev.querySelector('.editor-ctrl-btn.del');if(b){b.dataset.cf='0';b.innerHTML='<i class="fa-solid fa-xmark"></i>';b.style.color=''}}state.editor.delKey=null}}
-function reqDel(key){if(state.editor.delKey===key){clearFDC();deleteField(key)}else{clearFDC();state.editor.delKey=key;const card=findCardByKey(key);if(card){const b=card.querySelector('.editor-ctrl-btn.del');if(b){b.dataset.cf='1';b.innerHTML='<i class="fa-solid fa-skull"></i>';b.style.color='#e05a5a'}}showToast('Pulsa de nuevo','info');state.editor.delTm=setTimeout(clearFDC,2500)}}
-
-function createCard(key,text,isRaw){
-    const card=document.createElement('div');card.className='field-card bg-surface border border-border1 rounded-xl overflow-hidden mb-4 transition-all duration-300 hover:border-border2 hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-fade-in-up';card.dataset.key=key;
-    const head=document.createElement('div');head.className='field-card-head flex items-center px-4 py-3 bg-gradient-to-r from-[#12142a] to-[#0e1025] border-b border-border1 gap-3 cursor-pointer select-none';head.tabIndex=0;head.setAttribute('role','button');head.setAttribute('aria-expanded','true');
-    const tEl=document.createElement('div');tEl.className='font-cinzel text-[0.68rem] tracking-widest uppercase text-gold flex-1 flex items-center gap-2 min-w-0';
-    const fI=document.createElement('i');fI.className='fa-solid '+fIcon(key)+' text-goldDim text-[0.7rem] shrink-0';
-    const tT=document.createElement('span');tT.className='truncate';tT.textContent=key.replace(/_/g,' ').replace(/\./g,' › ');tEl.append(fI,tT);
-    const cc=document.createElement('span');cc.className='text-[0.65rem] text-text3 font-crimson italic';cc.textContent=text.length+' chars';
-    const tg=document.createElement('i');tg.className='fa-solid fa-chevron-down text-text3 text-[0.7rem] transition-transform duration-300';head.append(tEl,cc,tg);
-    const body=document.createElement('div');body.className='field-card-body px-5 py-4';body.style.overflow='hidden';
-    const togC=()=>{const c=!card.classList.contains('collapsed');if(c){body.style.maxHeight=body.scrollHeight+'px';requestAnimationFrame(()=>{card.classList.add('collapsed');body.style.maxHeight='0px'})}else{card.classList.remove('collapsed');body.style.maxHeight=body.scrollHeight+'px';body.addEventListener('transitionend',function oe(e){if(e.propertyName==='max-height'){body.style.maxHeight='none';body.removeEventListener('transitionend',oe)}})}head.setAttribute('aria-expanded',String(!c))};
-    head.addEventListener('click',e=>{if(e.target.closest('.editor-field-name')||e.target.closest('.editor-ctrl-btn'))return;togC()});head.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();togC()}});
-    const ce=document.createElement('div');
-    if(isRaw){ce.className='font-crimson text-[0.95rem] text-text2 whitespace-pre-wrap leading-[1.7]';const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');ce.innerHTML=esc(text).replace(/\{\{char\}\}/gi,'<span class="tag-char">{{char}}</span>').replace(/\{\{user\}\}/gi,'<span class="tag-user">{{user}}</span>')}
-    else{ce.className='font-crimson text-base text-text1 whitespace-pre-wrap leading-[1.7] outline-none border border-transparent rounded-lg p-2 -mx-2 transition-colors hover:bg-surface2 focus:bg-[#14162a] focus:border-border2 min-h-[2rem]';ce.contentEditable='true';ce.textContent=text}
-    let tC=null,tA=null;
-    const tB=document.createElement('div');tB.className='hidden mt-3 pt-3 border-t border-dashed border-violetDim/50';
-    const tL=document.createElement('p');tL.className='text-[0.6rem] font-cinzel tracking-widest uppercase text-violet2 mb-1.5';tL.innerHTML='<i class="fa-solid fa-language"></i> Traduccion';
-    const tX=document.createElement('div');tX.className='font-crimson text-base text-text2 italic whitespace-pre-wrap leading-[1.7]';tB.append(tL,tX);
-    if(!isRaw)ce.addEventListener('input',e=>{state.proc.data[key]=e.target.innerText;cc.textContent=e.target.innerText.length+' chars';state.proc.edited.add(key);tC=null;tB.classList.add('hidden');if(tA){tA.abort();tA=null}});
-    const acts=document.createElement('div');acts.className='flex gap-2 mt-4 pt-3 border-t border-border1';
-    const mkB=(icon,label,cls)=>{const b=document.createElement('button');b.className='font-cinzel text-[0.6rem] tracking-[0.12em] uppercase text-text3 hover:text-text1 bg-transparent hover:bg-surface2 border border-border1 hover:border-border2 active:scale-95 rounded-md px-3 py-1.5 transition-all flex items-center gap-1.5'+(cls||'');b.innerHTML=icon+' '+label;return b};
-    const eB=mkB('<i class="fa-solid fa-expand"></i>','Expandir');eB.addEventListener('click',()=>openExp(key,tT.textContent,fI.className,isRaw,ce,cc));
-    const trB=mkB('<i class="fa-solid fa-language"></i>','Traducir',' hover:text-violet2 hover:border-violetDim');trB.addEventListener('click',async()=>{if(!tB.classList.contains('hidden')){tB.classList.add('hidden');return}const src=isRaw?text:(state.proc.data[key]??ce.innerText);if(!src.trim()){showToast('Sin texto','info');return}tB.classList.remove('hidden');if(tC!==null){tX.textContent=tC;return}tX.innerHTML='<i class="fa-solid fa-spinner fa-spin text-violet2"></i>';trB.disabled=true;if(tA)tA.abort();tA=new AbortController();try{tC=await trText(src,'es',tA.signal);tX.textContent=tC||'(vacio)'}catch(err){if(err.name==='AbortError')return;tB.classList.add('hidden');showToast('Error','error')}finally{trB.disabled=false}});
-    const cB=mkB('<i class="fa-regular fa-copy"></i>','Copiar');cB.addEventListener('click',()=>copyClip(isRaw?text:(state.proc.data[key]??ce.innerText)));
-    if(!isRaw){if(state.editor.added.has(key)){const d=mkB('<i class="fa-solid fa-trash-can"></i>','Eliminar',' hover:text-[#e05a5a] hover:border-[#502020]');d.addEventListener('click',()=>deleteField(key));acts.append(d)}else{const r=mkB('<i class="fa-solid fa-rotate-left"></i>','Restaurar');r.addEventListener('click',()=>{const o=getExtracted()[key]||(key===VF.SP?sysPromptInput.value:(key===VF.UP?userPersonaInput.value:''));const cn=charNameInput.value.trim()||'{{char}}',un=userNameInput.value.trim()||'{{user}}';const res=(o||'').replace(/\{\{char\}\}/gi,()=>cn).replace(/\{\{user\}\}/gi,()=>un);ce.textContent=res;state.proc.data[key]=res;state.proc.edited.delete(key);cc.textContent=res.length+' chars';tC=null;tB.classList.add('hidden');if(tA){tA.abort();tA=null}showToast('Restaurado')});acts.append(r)}}
-    acts.append(eB,trB,cB);body.append(ce,acts,tB);card.append(head,body);return card;
-}
-
-/* Render */
-function renderRaw(){rawView.innerHTML='<p class="text-[0.78rem] text-text3 italic mb-4 px-1">Plantilla: <span class="tag-char">{{char}}</span> y <span class="tag-user">{{user}}</span></p>';Object.entries(getExtracted()).forEach(([k,v])=>rawView.appendChild(createCard(k,v,true)))}
-function renderProc(){clearFDC();const entries=Object.entries(state.proc.data);processedView.innerHTML='';if(entries.length===0&&!state.editor.active){processedView.innerHTML='<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan.</p></div>';updFab();return}const h=document.createElement('p');h.className='text-[0.72rem] text-text3 italic mb-4 px-1 flex items-center gap-2';if(state.editor.active)h.innerHTML='<i class="fa-solid fa-pen-ruler text-editor"></i> Editor activo.';else h.innerHTML='<i class="fa-solid fa-pen-to-square"></i> Clica para editar.';processedView.appendChild(h);entries.forEach(([k,v],i)=>{const c=createCard(k,v,false);c.style.animationDelay=i*0.05+'s';processedView.appendChild(c)});if(state.editor.active){decorateEd();const ab=document.createElement('button');ab.className='add-field-btn w-full flex items-center justify-center gap-3 py-6 text-text3 hover:text-editor transition-all animate-fade-in-up';ab.style.animationDelay=entries.length*0.05+'s';ab.innerHTML='<i class="fa-solid fa-plus text-lg"></i> <span class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase">Agregar Campo</span>';ab.addEventListener('click',openAddF);processedView.appendChild(ab)}updFab()}
-
-/* JSON Editor */
-const jeT=$('jsonEditorTextarea'),jeE=$('jsonEditorEmpty'),jeA=$('jsonEditorActive');
-const jeSL=$('jsonStatusLine'),jeSF=$('jsonStatusFields'),jeSS=$('jsonStatusSize'),jeSB=$('jsonStatusBar'),jeDB=$('jsonDirtyBadge');
-const jeFB=$('jsonFormatBtn'),jeRB=$('jsonResetBtn'),jeAB=$('jsonApplyBtn');
-function renderJSON(){if(!state.file.uploaded){jeE.classList.remove('hidden');jeA.classList.add('hidden');return}jeE.classList.add('hidden');jeA.classList.remove('hidden');const cur=Object.keys(state.proc.data).length?buildExp():deepClone(state.file.uploaded);jeT.value=JSON.stringify(cur,null,2);state.jsonEditor.snap=deepClone(cur);state.jsonEditor.dirty=false;updJS()}
-function updJS(){const t=jeT.value;jeSS.textContent=(new TextEncoder().encode(t).length/1024).toFixed(1)+' KB';try{const p=JSON.parse(t);state.jsonEditor.err=null;jeSL.innerHTML='<i class="fa-solid fa-circle-check text-[0.5rem]"></i> JSON valido';jeSL.className='text-editor flex items-center gap-1.5';jeSF.textContent=countObjFields(p)+' campo(s)';jeSB.classList.remove('has-error');jeT.classList.remove('has-error');jeAB.disabled=false;const sn=state.jsonEditor.snap?JSON.stringify(state.jsonEditor.snap,null,2):'';state.jsonEditor.dirty=t!==sn;jeT.classList.toggle('is-dirty',state.jsonEditor.dirty);jeDB.classList.toggle('hidden',!state.jsonEditor.dirty)}catch(err){state.jsonEditor.err=err;const m=err.message.match(/position\s+(\d+)/);let pos='';if(m){const l=(t.substring(0,parseInt(m[1])).match(/\n/g)||[]).length+1;pos=' (l'+l+')'}jeSL.innerHTML='<i class="fa-solid fa-circle-exclamation text-[0.5rem]"></i> Error'+pos;jeSL.className='text-[#e05a5a] flex items-center gap-1.5';jeSF.textContent='';jeSB.classList.add('has-error');jeT.classList.add('has-error');jeAB.disabled=true;jeDB.classList.toggle('hidden',t===(state.jsonEditor.snap?JSON.stringify(state.jsonEditor.snap,null,2):''))}}
-jeT.addEventListener('input',updJS);jeT.addEventListener('keydown',e=>{if(e.key==='Tab'){e.preventDefault();const s=jeT.selectionStart;jeT.value=jeT.value.substring(0,s)+'  '+jeT.value.substring(jeT.selectionEnd);jeT.selectionStart=jeT.selectionEnd=s+2;updJS()}});
-jeFB.addEventListener('click',()=>{try{jeT.value=JSON.stringify(JSON.parse(jeT.value),null,2);updJS();showToast('Formateado')}catch{showToast('JSON invalido','error')}});
-jeRB.addEventListener('click',()=>{if(!state.jsonEditor.snap)return;jeT.value=JSON.stringify(state.jsonEditor.snap,null,2);updJS();showToast('Revertido')});
-jeAB.addEventListener('click',applyJE);
-function applyJE(){try{const p=JSON.parse(jeT.value);state.file.uploaded=p;resetCardState();state.jsonEditor.snap=deepClone(p);const dup=extractFields(p),count=Object.keys(getExtracted()).length;const nm=p.name||(p.data&&p.data.name)||p.char_name||'';if(nm){charNameInput.value=nm;updLP()}rawCount.textContent=count;renderRaw();renderJSON();processBtn.disabled=count===0;if(count>0&&(userNameInput.value.trim()||sysPromptInput.value.trim()))processText();else{updJS();showToast(count>0?'Aplicado: '+count+' campo(s)':'Aplicado','info')}}catch(err){showToast('Error: '+err.message,'error')}}
-
-/* Tabs */
-function setActiveTab(id){['tabProcessed','tabRaw','tabJson'].forEach(tid=>{const tab=$(tid),active=tid===id;tab.classList.toggle('text-gold',active);tab.classList.toggle('border-gold',active);tab.classList.toggle('text-text3',!active);tab.classList.toggle('border-transparent',!active);tab.setAttribute('aria-selected',String(active));tab.classList.toggle('active',active)});processedView.classList.toggle('hidden',id!=='tabProcessed');rawView.classList.toggle('hidden',id!=='tabRaw');jsonView.classList.toggle('hidden',id!=='tabJson');searchContainer.classList.toggle('hidden',id==='tabJson');processedView.querySelectorAll('.field-card').forEach(c=>c.style.display='');rawView.querySelectorAll('.field-card').forEach(c=>c.style.display='');updFab();if(id==='tabJson'&&state.file.uploaded&&!state.jsonEditor.dirty)renderJSON();if(searchInput.value&&id!=='tabJson')searchInput.dispatchEvent(new Event('input'))}
-tabs.forEach(tab=>tab.addEventListener('click',e=>setActiveTab(e.currentTarget.id)));
-
-/* Editor */
-function updFab(){const hd=Object.keys(state.proc.data).length>0,ip=!processedView.classList.contains('hidden');fabContainer.classList.toggle('hidden',!hd||!ip);const ew=$('exportFabWrap');if(ew)ew.classList.toggle('hidden',!state.editor.active)}
-function togEd(){state.editor.active=!state.editor.active;editorToggle.classList.toggle('active',state.editor.active);editorToggle.setAttribute('aria-pressed',String(state.editor.active));editorInfoBar.classList.toggle('hidden',!state.editor.active);if(state.editor.active&&processedView.classList.contains('hidden'))$('tabProcessed').click();if(Object.keys(state.proc.data).length>0||state.editor.active)renderProc();updFab();showToast(state.editor.active?'Editor activado':'Editor desactivado','info')}
-editorToggle.addEventListener('click',togEd);
-function decorateEd(){processedView.querySelectorAll('.field-card').forEach(card=>{const key=card.dataset.key;if(!key)return;card.classList.add('editor-card');const head=card.querySelector('.field-card-head');if(!head)return;const tc=head.querySelector('.font-cinzel');if(tc){const sp=tc.querySelector('span.truncate');if(sp){const inp=document.createElement('input');inp.type='text';inp.className='editor-field-name';inp.value=key;inp.title='Renombrar';inp.addEventListener('focus',e=>e.stopPropagation());inp.addEventListener('click',e=>e.stopPropagation());inp.addEventListener('keydown',e=>{e.stopPropagation();if(e.key==='Enter')inp.blur();if(e.key==='Escape'){inp.value=key;inp.blur()}});inp.addEventListener('blur',()=>{if(inp.value.trim()&&inp.value!==key)renameField(key,inp.value)});sp.replaceWith(inp)}}const ctrl=document.createElement('div');ctrl.className='editor-controls flex items-center gap-0.5 ml-1';const mkC=(i,c,t)=>{const b=document.createElement('button');b.type='button';b.className='editor-ctrl-btn '+(c||'');b.innerHTML='<i class="fa-solid '+i+'"></i>';b.title=t;return b};const u=mkC('fa-caret-up','','Arriba');u.addEventListener('click',e=>{e.stopPropagation();movField(key,-1)});const d=mkC('fa-caret-down','','Abajo');d.addEventListener('click',e=>{e.stopPropagation();movField(key,1)});const dl=mkC('fa-xmark','del','Eliminar');dl.addEventListener('click',e=>{e.stopPropagation();reqDel(key)});ctrl.append(u,d,dl);const ch=head.querySelector('.fa-chevron-down');if(ch)ch.after(ctrl);else head.appendChild(ctrl)})}
-
-function movField(key,dir){const e=Object.entries(state.proc.data),i=e.findIndex(([k])=>k===key);if(i===-1)return;const ni=i+dir;if(ni<0||ni>=e.length)return;[e[i],e[ni]]=[e[ni],e[i]];state.proc.data=Object.fromEntries(e);renderProc()}
-function addField(key,val){state.proc.data[key]=val;state.proc.edited.add(key);state.editor.added.add(key);state.editor.removed.delete(key);processedCount.textContent=Object.keys(state.proc.data).length;renderProc()}
-function deleteField(key){delete state.proc.data[key];state.proc.edited.delete(key);if(state.editor.added.has(key)){state.editor.added.delete(key)}else{state.editor.removed.add(key)}delete getExtracted()[key];processedCount.textContent=Object.keys(state.proc.data).length;renderProc();updFab();showToast('"'+key+'" eliminado','info')}
-function renameField(oldKey,newName){const nk=sanitizeKey(newName);if(!isValidKey(nk,oldKey)){if(nk===oldKey)return;showToast(RESERVED_KEYS.has(nk)?'Nombre reservado':'Nombre invalido','error');renderProc();return}if(state.proc.data[nk]!==undefined){showToast('Ya existe "'+nk+'"','error');renderProc();return}const e=Object.entries(state.proc.data),i=e.findIndex(([k])=>k===oldKey);if(i===-1)return;e[i]=[nk,e[i][1]];state.proc.data=Object.fromEntries(e);if(state.proc.edited.has(oldKey)){state.proc.edited.delete(oldKey);state.proc.edited.add(nk)}if(state.editor.added.has(oldKey)){state.editor.added.delete(oldKey);state.editor.added.add(nk)}else{state.editor.removed.add(oldKey)}if(getExtracted()[oldKey]!==undefined){getExtracted()[nk]=getExtracted()[oldKey];delete getExtracted()[oldKey]}renderProc();showToast('Renombrado a "'+nk+'"')}
-
-/* buildExp: routes custom fields to extensions.scriptorium.fields with schema version 1 */
-function buildExp(){
-    const cn=charNameInput.value.trim()||'Character';
-    let card;
-    if(state.file.uploaded&&typeof state.file.uploaded==='object'){
-        card=deepClone(state.file.uploaded);
-        if(!card.data||typeof card.data!=='object')card.data={}
-    }else card={spec:'chara_card_v2',spec_version:'2.0',data:{}};
-    card.spec='chara_card_v2';card.spec_version='2.0';card.data.name=cn;
-
-    /* Remove deleted/renamed originals from data AND extensions */
-    for(const key of state.editor.removed){
-        deleteNestedValue(card.data,key);
-        if(card.extensions&&card.extensions.scriptorium&&card.extensions.scriptorium.fields&&card.extensions.scriptorium.fields[key]!==undefined){
-            delete card.extensions.scriptorium.fields[key]
-        }
-    }
-
-    /* Classify each field */
-    const extFields={};
-    for(const[k,v]of Object.entries(state.proc.data)){
-        if(k===VF.SP){card.data.system_prompt=v;continue}
-        if(k in card.data||V2_DATA_FIELDS.has(k)){card.data[k]=v;continue}
-        if(k.includes('.')){try{setNestedValue(card.data,k,v)}catch(err){showToast(err.message,'error')}continue}
-        /* Custom / non-standard → extensions.scriptorium.fields */
-        extFields[k]={value:v,created:state.editor.added.has(k)}
-    }
-
-    /* Write extensions with explicit version 1 */
-    if(Object.keys(extFields).length>0){
-        if(!card.extensions)card.extensions={};
-        const existing=card.extensions.scriptorium||{};
-        card.extensions.scriptorium={...existing,version:1,fields:{...(existing.fields||{}),...extFields}}
-    }
-
-    return card;
-}
-
-/* Modals */
-function openAboutModal(){lastTrigger=document.activeElement;aboutModal.classList.remove('hidden');aboutModal.classList.add('flex');aboutClose.focus()}
-function closeAboutModal(){aboutModal.classList.add('hidden');aboutModal.classList.remove('flex');restoreFocus()}
-aboutBtn.addEventListener('click',openAboutModal);
-aboutClose.addEventListener('click',closeAboutModal);
-aboutBackdrop.addEventListener('click',closeAboutModal);
-aboutModal.addEventListener('keydown',e=>trapFocus(e,aboutModal));
-
-function closeExp(){$('expandModal').classList.add('hidden');$('expandModal').classList.remove('flex');$('expandModalContent').contentEditable='false';$('expandModalContent').oninput=null;$('expandModalTranslation').classList.add('hidden');state.tr.mc=null;if(state.tr.ma){state.tr.ma.abort();state.tr.ma=null}restoreFocus()}
-$('expandModalClose').addEventListener('click',closeExp);$('expandModalBackdrop').addEventListener('click',closeExp);$('expandModal').addEventListener('keydown',e=>trapFocus(e,$('expandModal')));
-$('expandModalTranslateBtn').addEventListener('click',async()=>{const tb=$('expandModalTranslation'),tx=$('expandModalTranslationText');if(!tb.classList.contains('hidden')){tb.classList.add('hidden');return}const src=$('expandModalContent').innerText;if(!src.trim()){showToast('Sin texto','info');return}tb.classList.remove('hidden');if(state.tr.mc!==null){tx.textContent=state.tr.mc;return}tx.innerHTML='<i class="fa-solid fa-spinner fa-spin text-violet2"></i>';$('expandModalTranslateBtn').disabled=true;if(state.tr.ma)state.tr.ma.abort();state.tr.ma=new AbortController();try{state.tr.mc=await trText(src,'es',state.tr.ma.signal);tx.textContent=state.tr.mc||'(vacio)'}catch(err){if(err.name==='AbortError')return;tb.classList.add('hidden');showToast('Error','error')}finally{$('expandModalTranslateBtn').disabled=false}});
-function wci(t){const w=t.trim()?t.trim().split(/\s+/).length:0;return t.length+' chars · '+w+' palabras'}
-function openExp(key,label,cls,isRaw,ce,cc){lastTrigger=document.activeElement;$('expandModalTranslation').classList.add('hidden');state.tr.mc=null;$('expandModalTitle').textContent=label;$('expandModalIcon').className=cls;const cur=ce.innerText;$('expandModalContent').textContent=cur;$('expandModalCount').textContent=wci(cur);if(isRaw){$('expandModalContent').contentEditable='false';$('expandModalContent').className='font-crimson text-base text-text1 whitespace-pre-wrap leading-[1.8] outline-none min-h-[30vh]';$('expandModalHint').textContent='Solo lectura.'}else{$('expandModalContent').contentEditable='true';$('expandModalContent').className='font-crimson text-base text-text1 whitespace-pre-wrap leading-[1.8] outline-none min-h-[30vh] focus:bg-[#14162a] rounded-lg p-2 -m-2';$('expandModalHint').innerHTML='<i class="fa-solid fa-circle-info mr-1"></i> Cambios instantaneos.';$('expandModalContent').oninput=()=>{const v=$('expandModalContent').innerText;ce.textContent=v;state.proc.data[key]=v;state.proc.edited.add(key);cc.textContent=v.length+' chars';$('expandModalCount').textContent=wci(v);state.tr.mc=null;$('expandModalTranslation').classList.add('hidden')}}$('expandModal').classList.remove('hidden');$('expandModal').classList.add('flex');if(isRaw)$('expandModalClose').focus();else $('expandModalContent').focus()}
-
-function openAddF(){lastTrigger=document.activeElement;$('addFieldPreset').value='';$('addFieldKey').value='';$('addFieldValue').value='';$('addFieldKey').disabled=false;$('addFieldError').classList.add('hidden');$('addFieldModal').classList.remove('hidden');$('addFieldModal').classList.add('flex');$('addFieldPreset').focus()}
-function closeAddF(){$('addFieldModal').classList.add('hidden');$('addFieldModal').classList.remove('flex');restoreFocus()}
-$('addFieldBackdrop').addEventListener('click',closeAddF);$('addFieldClose').addEventListener('click',closeAddF);$('addFieldCancel').addEventListener('click',closeAddF);$('addFieldModal').addEventListener('keydown',e=>trapFocus(e,$('addFieldModal')));
-$('addFieldPreset').addEventListener('change',()=>{const v=$('addFieldPreset').value;if(v&&v!=='custom'){$('addFieldKey').value=v;$('addFieldKey').disabled=true}else{$('addFieldKey').value='';$('addFieldKey').disabled=false;if(v==='custom')$('addFieldKey').focus()}$('addFieldError').classList.add('hidden')});
-$('addFieldConfirm').addEventListener('click',()=>{const nk=sanitizeKey($('addFieldKey').value);if(!nk){$('addFieldError').textContent='Ingresa un nombre.';$('addFieldError').classList.remove('hidden');return}if(RESERVED_KEYS.has(nk)){$('addFieldError').textContent='Nombre reservado.';$('addFieldError').classList.remove('hidden');return}if(state.proc.data[nk]!==undefined){$('addFieldError').textContent='"'+nk+'" ya existe.';$('addFieldError').classList.remove('hidden');return}addField(nk,$('addFieldValue').value);closeAddF();showToast('"'+nk+'" agregado')});
-
-function openExpModal(){lastTrigger=document.activeElement;$('exportJsonPreview').value=JSON.stringify(buildExp(),null,2);$('exportModal').classList.remove('hidden');$('exportModal').classList.add('flex');$('exportClose').focus()}
-function closeExpModal(){$('exportModal').classList.add('hidden');$('exportModal').classList.remove('flex');restoreFocus()}
-$('exportJsonBtn').addEventListener('click',openExpModal);$('exportBackdrop').addEventListener('click',closeExpModal);$('exportClose').addEventListener('click',closeExpModal);$('exportModal').addEventListener('keydown',e=>trapFocus(e,$('exportModal')));
-$('exportCopyJson').addEventListener('click',()=>copyClip($('exportJsonPreview').value));
-$('exportDownload').addEventListener('click',()=>{const cn=charNameInput.value.trim()||'character';const blob=new Blob([$('exportJsonPreview').value],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=cn.replace(/[^a-z0-9_\-]/gi,'_')+'_card.json';document.body.appendChild(a);a.click();document.body.removeChild(a);URL.revokeObjectURL(url);showToast('Descargado')});
-
-/* Translation */
-function splitCh(t,ml){ml=ml||1800;const c=[];let r=t;while(r.length>ml){let i=r.lastIndexOf('\n',ml);if(i<ml*0.5)i=r.lastIndexOf(' ',ml);if(i<1)i=ml;c.push(r.slice(0,i));r=r.slice(i)}if(r)c.push(r);return c}
-async function trChunk(t,tl,sig){const res=await fetch('https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='+tl+'&dt=t&q='+encodeURIComponent(t),{signal:sig});if(!res.ok)throw new Error('http-'+res.status);const d=await res.json();return d[0].map(s=>s[0]).join('')}
-async function trText(t,tl,sig){tl=tl||'es';if(!t||!t.trim())return'';const ch=splitCh(t),p=[];for(const c of ch){if(sig&&sig.aborted)throw new DOMException('Aborted','AbortError');p.push(await trChunk(c,tl,sig))}return p.join('')}
-
-/* Search */
-searchInput.addEventListener('input',e=>{const q=e.target.value.toLowerCase();searchClearBtn.classList.toggle('hidden',!q);if(!jsonView.classList.contains('hidden'))return;const av=processedView.classList.contains('hidden')?rawView:processedView;let vc=0;av.querySelectorAll('.field-card').forEach(c=>{const m=!q||c.innerText.toLowerCase().includes(q);c.style.display=m?'':'none';if(m)vc++});updNR(q,vc,av)});
-searchClearBtn.addEventListener('click',()=>{searchInput.value='';processedView.querySelectorAll('.field-card').forEach(c=>c.style.display='');rawView.querySelectorAll('.field-card').forEach(c=>c.style.display='');const av=processedView.classList.contains('hidden')?rawView:processedView;const nr=av.querySelector('.no-results-state');if(nr)nr.remove();searchInput.focus()});
-function updNR(q,vc,v){let nr=v.querySelector('.no-results-state');if(q&&vc===0&&v.querySelector('.field-card')){if(!nr){nr=document.createElement('div');nr.className='no-results-state flex flex-col items-center justify-center text-center px-4 py-16';const i=document.createElement('i');i.className='fa-solid fa-feather-pointed text-2xl text-text3 opacity-40 mb-3';const p=document.createElement('p');p.className='text-text3 italic text-sm';nr.append(i,p);v.appendChild(nr)}nr.querySelector('p').textContent='Sin resultados para "'+q+'"'}else if(nr)nr.remove()}
-
-/* Utilities */
-async function copyClip(t){let ok=false;try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(t);ok=true}}catch{}if(!ok){let ta;try{ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;top:0;left:0;opacity:0';document.body.appendChild(ta);ta.focus();ta.select();ok=document.execCommand('copy')}catch{ok=false}finally{if(ta?.parentNode)ta.remove()}}showToast(ok?'Copiado':'Error',ok?'success':'error')}
-function copyAll(){if(!Object.keys(state.proc.data).length)return;copyClip(Object.entries(state.proc.data).map(([k,v])=>'=== '+k.toUpperCase().replace(/_/g,' ')+' ===\n'+v).join('\n\n'))}
-$('copyAllBtn').addEventListener('click',copyAll);
-
-function clearAll(){closeAboutModal();closeExp();closeAddF();closeExpModal();rstDel();clearFDC();fileInput.value='';state.file.uploaded=null;state.file.extracted={};state.proc.data={};state.proc.edited.clear();state.editor.active=false;state.editor.added.clear();state.editor.removed.clear();state.jsonEditor.snap=null;state.jsonEditor.dirty=false;state.jsonEditor.err=null;editorToggle.classList.remove('active');editorToggle.setAttribute('aria-pressed','false');editorInfoBar.classList.add('hidden');uploadStatus.classList.add('hidden');charNameInput.value='';updLP();processBtn.disabled=true;processedCount.textContent='0';rawCount.textContent='0';rawView.innerHTML='';searchInput.value='';searchClearBtn.classList.add('hidden');searchContainer.classList.remove('hidden');document.querySelectorAll('.field-card').forEach(c=>c.style.display='');applyP();processedView.innerHTML='<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan.</p></div>';renderJSON();setActiveTab('tabProcessed');showToast('Tomo purificado')}
-clearBtn.addEventListener('click',clearAll);
-
-document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='Enter'&&!e.shiftKey){e.preventDefault();if(!processBtn.disabled)processBtn.click()}if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key==='Enter'){e.preventDefault();if(!jsonView.classList.contains('hidden')&&!jeAB.disabled)applyJE()}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='e'){if(!e.target.matches('input,textarea,[contenteditable="true"]')){e.preventDefault();togEd()}}if(e.key==='Escape'){if(!$('aboutModal').classList.contains('hidden'))closeAboutModal();else if(!$('expandModal').classList.contains('hidden'))closeExp();else if(!$('addFieldModal').classList.contains('hidden'))closeAddF();else if(!$('exportModal').classList.contains('hidden'))closeExpModal()}});
-
-loadProfiles();renderJSON();
-});
-</script>
+    <script type="module" src="./js/app.js"></script>
 </body>
 </html>
