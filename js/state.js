@@ -1,5 +1,3 @@
-// js/state.js
-
 export const STORAGE_KEYS = {
     SIDEBAR: 'scriptorium_sidebar_collapsed',
     PROFILES: 'scriptorium_profiles',
@@ -33,9 +31,7 @@ const state = {
     jsonEditor: { snap: null, dirty: false, err: null },
     profiles: {
         active: 'default',
-        lib: {
-            default: { id: 'default', label: 'Perfil Inicial', name: '', persona: '', sp: '' }
-        }
+        lib: { default: { id: 'default', label: 'Perfil Inicial', name: '', persona: '', sp: '' } }
     },
     ui: { dCnf: false, dTm: null },
     canvas: { run: true },
@@ -44,7 +40,4 @@ const state = {
 };
 
 export default state;
-
-export function getExtracted() {
-    return state.file.extracted;
-}
+export function getExtracted() { return state.file.extracted; }
