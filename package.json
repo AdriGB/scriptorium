@@ -2,7 +2,7 @@
   "name": "scriptorium",
   "version": "1.1.0",
   "private": true,
-  "description": "Editor ligero y offline-first para tarjetas de personaje CharaCard v2 — compatible con PNG y JSON, con boveda IndexedDB y traduccion integrada.",
+  "description": "Editor ligero y offline-first para tarjetas de personaje CharaCard v2 — compatible con PNG y JSON, con bóveda IndexedDB y traducción integrada.",
   "scripts": {
     "check": "esbuild js/app.js --bundle --format=esm --outfile=dist/check.js"
   },
