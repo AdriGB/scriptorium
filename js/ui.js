@@ -1,6 +1,6 @@
 import state, { STORAGE_KEYS } from './state.js';
 import { $, Storage, showToast, trapFocus } from './utils.js';
-import { renderJSON, updJS, applyJE, updFab } from './editor.js';
+import { renderJSON, updJS, applyJE, updFab, renderLorebook } from './editor.js';
 
 /* ─── Canvas ─── */
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -56,7 +56,7 @@ export function initSidebar() {
 
 /* ─── Tabs ─── */
 export function setActiveTab(id) {
-    ['tabProcessed', 'tabRaw', 'tabJson'].forEach(tid => {
+    ['tabProcessed', 'tabRaw', 'tabJson', 'tabLorebook'].forEach(tid => {
         const tab = $(tid), active = tid === id;
         tab.classList.toggle('text-gold', active); tab.classList.toggle('border-gold', active);
         tab.classList.toggle('text-text3', !active); tab.classList.toggle('border-transparent', !active);
@@ -65,13 +65,14 @@ export function setActiveTab(id) {
     $('processedView').classList.toggle('hidden', id !== 'tabProcessed');
     $('rawView').classList.toggle('hidden', id !== 'tabRaw');
     $('jsonView').classList.toggle('hidden', id !== 'tabJson');
-    $('searchContainer').classList.toggle('hidden', id === 'tabJson');
+    $('lorebookView').classList.toggle('hidden', id !== 'tabLorebook');
+    $('searchContainer').classList.toggle('hidden', id === 'tabJson' || id === 'tabLorebook');
     $('processedView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
     $('rawView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
     if (id === 'tabJson' && state.file.uploaded && !state.jsonEditor.dirty) renderJSON();
+    if (id === 'tabLorebook') renderLorebook();
     const si = $('searchInput');
-    if (si.value && id !== 'tabJson') si.dispatchEvent(new Event('input'));
-    // FIX: update FAB visibility when switching tabs
+    if (si.value && id !== 'tabJson' && id !== 'tabLorebook') si.dispatchEvent(new Event('input'));
     updFab();
 }
 
@@ -102,6 +103,7 @@ export function initSearch() {
         const q = e.target.value.toLowerCase();
         searchClearBtn.classList.toggle('hidden', !q);
         if (!$('jsonView').classList.contains('hidden')) return;
+        if (!$('lorebookView').classList.contains('hidden')) return;
         const av = $('processedView').classList.contains('hidden') ? $('rawView') : $('processedView');
         let vc = 0;
         av.querySelectorAll('.field-card').forEach(c => { const m = !q || c.innerText.toLowerCase().includes(q); c.style.display = m ? '' : 'none'; if (m) vc++; });
@@ -198,19 +200,12 @@ export function initExportModal() {
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         showToast('Descargado');
     });
-
-    // PNG export listeners
     $('exportPngInput')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         const nameEl = $('exportPngName');
         const btnEl = $('exportDownloadPng');
-        if (file) {
-            if (nameEl) nameEl.textContent = file.name;
-            if (btnEl) btnEl.disabled = false;
-        } else {
-            if (nameEl) nameEl.textContent = '';
-            if (btnEl) btnEl.disabled = true;
-        }
+        if (file) { if (nameEl) nameEl.textContent = file.name; if (btnEl) btnEl.disabled = false; }
+        else { if (nameEl) nameEl.textContent = ''; if (btnEl) btnEl.disabled = true; }
     });
     $('exportDownloadPng')?.addEventListener('click', async () => {
         const { exportPng } = await import('./export.js');

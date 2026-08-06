@@ -71,6 +71,10 @@ export function resetCardState() {
     state.jsonEditor.snap = null;
     state.jsonEditor.dirty = false;
     state.jsonEditor.err = null;
+    state.characterBook.entries = [];
+    state.altGreetings.original = '';
+    state.altGreetings.list = [];
+    state.altGreetings.current = 0;
 }
 
 /* ─── Create card ─── */
@@ -206,7 +210,7 @@ export function renderProc() {
     pv.innerHTML = '';
     if (entries.length === 0 && !state.editor.active) {
         pv.innerHTML = '<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan.</p></div>';
-        updFab(); return;
+        updFab(); updLorebookCount(); return;
     }
     const h = document.createElement('p');
     h.className = 'text-[0.72rem] text-text3 italic mb-4 px-1 flex items-center gap-2';
@@ -224,7 +228,10 @@ export function renderProc() {
         ab.addEventListener('click', openAddF);
         pv.appendChild(ab);
     }
+    // Alt greetings decoration
+    if (state.altGreetings.list.length > 0) decorateAltGreetings();
     updFab();
+    updLorebookCount();
 }
 
 /* ─── Editor decorations ─── */
@@ -324,8 +331,14 @@ export function processText() {
         const k = VF.SP;
         state.proc.data[k] = state.proc.edited.has(k) && prev[k] ? prev[k] : sp.replace(cR, () => cn).replace(uR, () => un);
     }
+    const allGreetings = [state.altGreetings.original, ...state.altGreetings.list];
     for (const [k, v] of Object.entries(getExtracted())) {
-        state.proc.data[k] = state.proc.edited.has(k) && prev[k] !== undefined ? prev[k] : v.replace(cR, () => cn).replace(uR, () => un);
+        let rawValue = v;
+        if (k === 'first_mes' && state.altGreetings.list.length > 0) {
+            const idx = state.altGreetings.current;
+            if (idx > 0 && idx < allGreetings.length) rawValue = allGreetings[idx];
+        }
+        state.proc.data[k] = state.proc.edited.has(k) && prev[k] !== undefined ? prev[k] : rawValue.replace(cR, () => cn).replace(uR, () => un);
     }
     if (persona) {
         const k = VF.UP;
@@ -345,8 +358,9 @@ export function togEd() {
     $('editorToggle').classList.toggle('active', state.editor.active);
     $('editorToggle').setAttribute('aria-pressed', String(state.editor.active));
     $('editorInfoBar').classList.toggle('hidden', !state.editor.active);
-    if (state.editor.active && processedView().classList.contains('hidden')) $('tabProcessed').click();
+    if (state.editor.active && processedView().classList.contains('hidden') && $('lorebookView')?.classList.contains('hidden')) $('tabProcessed').click();
     if (Object.keys(state.proc.data).length > 0 || state.editor.active) renderProc();
+    if (!$('lorebookView')?.classList.contains('hidden')) renderLorebook();
     updFab();
     showToast(state.editor.active ? 'Editor activado' : 'Editor desactivado', 'info');
 }
@@ -476,7 +490,275 @@ export function applyJE() {
         renderRaw(); renderJSON();
         processBtn().disabled = count === 0;
         if (count > 0 && (userNameInput().value.trim() || $('sysPrompt').value.trim())) processText();
-        else { updJS(); showToast(count > 0 ? 'Aplicado: ' + count + ' campo(s)' : 'Aplicado', 'info'); }
+        else { updJS(); updLorebookCount(); showToast(count > 0 ? 'Aplicado: ' + count + ' campo(s)' : 'Aplicado', 'info'); }
         state.vault.dirty = true;
     } catch (err) { showToast('Error: ' + err.message, 'error'); }
+}
+
+/* ═══════════════════════════════════════════════════
+   ALTERNATE GREETINGS
+   ═══════════════════════════════════════════════════ */
+
+function getAllGreetings() {
+    return [state.altGreetings.original, ...state.altGreetings.list];
+}
+
+function swapAltGreeting(newIndex) {
+    const all = getAllGreetings();
+    if (newIndex < 0 || newIndex >= all.length) return;
+    state.altGreetings.current = newIndex;
+    const cn = charNameInput().value.trim() || '{{char}}';
+    const un = userNameInput().value.trim() || '{{user}}';
+    const processed = all[newIndex].replace(/\{\{char\}\}/gi, () => cn).replace(/\{\{user\}\}/gi, () => un);
+    state.proc.data['first_mes'] = processed;
+    state.vault.dirty = true;
+
+    const card = findCardByKey('first_mes');
+    if (card) {
+        const contentEl = card.querySelector('.field-card-body [contenteditable]');
+        if (contentEl) contentEl.textContent = processed;
+        const countEl = card.querySelector('.field-card-head .font-crimson');
+        if (countEl) countEl.textContent = processed.length + ' chars';
+    }
+    updateAltGreetingNav();
+}
+
+function updateAltGreetingNav() {
+    const nav = processedView()?.querySelector('.alt-greeting-nav');
+    if (!nav) return;
+    const all = getAllGreetings();
+    const label = nav.querySelector('.alt-greeting-label');
+    const prevBtn = nav.querySelector('.alt-prev');
+    const nextBtn = nav.querySelector('.alt-next');
+    if (label) label.textContent = 'Saludo ' + (state.altGreetings.current + 1) + ' / ' + all.length;
+    if (prevBtn) prevBtn.classList.toggle('opacity-30', state.altGreetings.current === 0);
+    if (nextBtn) nextBtn.classList.toggle('opacity-30', state.altGreetings.current >= all.length - 1);
+}
+
+function decorateAltGreetings() {
+    const all = getAllGreetings();
+    if (all.length <= 1) return;
+    const card = findCardByKey('first_mes');
+    if (!card) return;
+    const body = card.querySelector('.field-card-body');
+    if (!body || body.querySelector('.alt-greeting-nav')) return;
+
+    const nav = document.createElement('div');
+    nav.className = 'alt-greeting-nav flex items-center justify-between bg-surface2 border border-border1 rounded-lg px-3 py-2 mb-3';
+
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'alt-prev w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-gold hover:bg-surface transition-all';
+    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left text-xs"></i>';
+
+    const label = document.createElement('span');
+    label.className = 'alt-greeting-label font-cinzel text-[0.6rem] tracking-wider uppercase text-text3';
+
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'alt-next w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-gold hover:bg-surface transition-all';
+    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right text-xs"></i>';
+
+    prevBtn.addEventListener('click', e => { e.stopPropagation(); if (state.altGreetings.current > 0) swapAltGreeting(state.altGreetings.current - 1); });
+    nextBtn.addEventListener('click', e => { e.stopPropagation(); if (state.altGreetings.current < all.length - 1) swapAltGreeting(state.altGreetings.current + 1); });
+
+    nav.append(prevBtn, label, nextBtn);
+    body.insertBefore(nav, body.firstChild);
+    updateAltGreetingNav();
+}
+
+/* ═══════════════════════════════════════════════════
+   LOREBOOK (CHARACTER BOOK)
+   ═══════════════════════════════════════════════════ */
+
+export function updLorebookCount() {
+    const el = $('lorebookCount');
+    if (el) el.textContent = state.characterBook.entries.length;
+}
+
+export function addLorebookEntry() {
+    state.characterBook.entries.push({
+        keys: [],
+        content: '',
+        enabled: true,
+        insertion_order: state.characterBook.entries.length,
+        extensions: {}
+    });
+    state.vault.dirty = true;
+    renderLorebook();
+}
+
+function moveLorebookEntry(index, dir) {
+    const entries = state.characterBook.entries;
+    const ni = index + dir;
+    if (ni < 0 || ni >= entries.length) return;
+    [entries[index], entries[ni]] = [entries[ni], entries[index]];
+    state.vault.dirty = true;
+    renderLorebook();
+}
+
+export function renderLorebook() {
+    const lv = $('lorebookView');
+    if (!lv) return;
+    lv.innerHTML = '';
+    const entries = state.characterBook.entries;
+
+    if (entries.length === 0 && !state.editor.active) {
+        lv.innerHTML = '<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 mb-4"><i class="fa-solid fa-book-atlas text-text3"></i></div><p class="text-text3 italic max-w-sm text-sm">Sin entradas de lorebook.</p><p class="text-text3/60 text-xs mt-2">Carga un tomo con character_book o activa el editor para crear entradas.</p></div>';
+        updLorebookCount();
+        return;
+    }
+
+    const header = document.createElement('p');
+    header.className = 'text-[0.72rem] text-text3 italic mb-4 px-1 flex items-center gap-2';
+    header.innerHTML = state.editor.active
+        ? '<i class="fa-solid fa-pen-ruler text-editor"></i> Editando lorebook (' + entries.length + ' entradas).'
+        : '<i class="fa-solid fa-book-atlas"></i> ' + entries.length + ' entradas del lorebook.';
+    lv.appendChild(header);
+
+    entries.forEach((entry, i) => {
+        const card = document.createElement('div');
+        card.className = 'field-card bg-surface border border-border1 rounded-xl overflow-hidden mb-4 transition-all duration-300 hover:border-border2 hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-fade-in-up';
+        card.style.animationDelay = i * 0.05 + 's';
+        card.dataset.lbIndex = i;
+
+        // Head
+        const head = document.createElement('div');
+        head.className = 'field-card-head flex items-center px-4 py-3 bg-gradient-to-r from-[#0e2a24] to-[#0a1e1a] border-b border-border1 gap-3 cursor-pointer select-none';
+        head.tabIndex = 0; head.setAttribute('role', 'button'); head.setAttribute('aria-expanded', 'true');
+
+        const icon = document.createElement('i');
+        icon.className = 'fa-solid fa-book-bookmark text-editor text-[0.7rem] shrink-0';
+
+        const keysEl = document.createElement('span');
+        keysEl.className = 'font-cinzel text-[0.65rem] tracking-wider uppercase text-editor flex-1 truncate';
+        keysEl.textContent = entry.keys.length > 0 ? entry.keys.join(', ') : '(sin claves)';
+
+        const enabledBadge = document.createElement('span');
+        enabledBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson ' + (entry.enabled ? 'bg-editor/20 text-editor' : 'bg-[#3a2020] text-[#e05a5a]');
+        enabledBadge.textContent = entry.enabled ? 'activo' : 'inactivo';
+
+        const countEl = document.createElement('span');
+        countEl.className = 'text-[0.6rem] text-text3 font-crimson italic';
+        countEl.textContent = entry.content.length + ' chars';
+
+        const arrow = document.createElement('i');
+        arrow.className = 'fa-solid fa-chevron-down text-text3 text-[0.7rem] transition-transform duration-300';
+
+        head.append(icon, keysEl, enabledBadge, countEl, arrow);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = 'field-card-body px-5 py-4';
+        body.style.overflow = 'hidden';
+
+        const togC = () => {
+            const c = !card.classList.contains('collapsed');
+            if (c) { body.style.maxHeight = body.scrollHeight + 'px'; requestAnimationFrame(() => { card.classList.add('collapsed'); body.style.maxHeight = '0px'; }); }
+            else { card.classList.remove('collapsed'); body.style.maxHeight = body.scrollHeight + 'px'; body.addEventListener('transitionend', function oe(e) { if (e.propertyName === 'max-height') { body.style.maxHeight = 'none'; body.removeEventListener('transitionend', oe); } }); }
+            head.setAttribute('aria-expanded', String(!c));
+        };
+        head.addEventListener('click', e => { if (e.target.closest('.editor-ctrl-btn')) return; togC(); });
+
+        // Keys editing (editor mode)
+        let keysInput = null;
+        if (state.editor.active) {
+            const keysSection = document.createElement('div');
+            keysSection.className = 'mb-3';
+            const kl = document.createElement('label');
+            kl.className = 'font-cinzel text-[0.55rem] tracking-wider uppercase text-text3 mb-1 block';
+            kl.textContent = 'Claves (separadas por coma)';
+            keysInput = document.createElement('input');
+            keysInput.type = 'text';
+            keysInput.className = 'w-full bg-bg2 border border-border1 rounded-lg px-3 py-1.5 text-text1 text-xs outline-none focus:border-editor font-mono';
+            keysInput.value = entry.keys.join(', ');
+            keysInput.addEventListener('click', e => e.stopPropagation());
+            keysInput.addEventListener('blur', () => {
+                entry.keys = keysInput.value.split(',').map(k => k.trim()).filter(k => k);
+                keysEl.textContent = entry.keys.length > 0 ? entry.keys.join(', ') : '(sin claves)';
+                state.vault.dirty = true;
+            });
+            keysSection.append(kl, keysInput);
+            body.append(keysSection);
+        }
+
+        // Content
+        const contentEl = document.createElement('div');
+        if (state.editor.active) {
+            contentEl.className = 'font-crimson text-sm text-text1 whitespace-pre-wrap leading-[1.7] min-h-[2rem] outline-none border border-transparent rounded-lg p-2 -mx-2 transition-colors hover:bg-surface2 focus:bg-[#14162a] focus:border-border2';
+            contentEl.contentEditable = 'true';
+            contentEl.textContent = entry.content;
+            contentEl.addEventListener('input', () => {
+                entry.content = contentEl.innerText;
+                countEl.textContent = contentEl.innerText.length + ' chars';
+                state.vault.dirty = true;
+            });
+        } else {
+            contentEl.className = 'font-crimson text-sm text-text1 whitespace-pre-wrap leading-[1.7] min-h-[2rem]';
+            contentEl.textContent = entry.content || '(vacio)';
+        }
+        body.append(contentEl);
+
+        // Actions
+        const acts = document.createElement('div');
+        acts.className = 'flex gap-2 mt-4 pt-3 border-t border-border1';
+
+        const mkB = (ic, label, cls = '') => {
+            const b = document.createElement('button');
+            b.className = 'font-cinzel text-[0.6rem] tracking-[0.12em] uppercase text-text3 hover:text-text1 bg-transparent hover:bg-surface2 border border-border1 hover:border-border2 rounded-md px-3 py-1.5 transition-all flex items-center gap-1.5 ' + cls;
+            b.innerHTML = ic + ' ' + label;
+            return b;
+        };
+
+        const toggleBtn = mkB(entry.enabled ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>', entry.enabled ? 'Desactivar' : 'Activar');
+        toggleBtn.addEventListener('click', () => {
+            entry.enabled = !entry.enabled;
+            enabledBadge.textContent = entry.enabled ? 'activo' : 'inactivo';
+            enabledBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson ' + (entry.enabled ? 'bg-editor/20 text-editor' : 'bg-[#3a2020] text-[#e05a5a]');
+            toggleBtn.innerHTML = (entry.enabled ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>') + ' ' + (entry.enabled ? 'Desactivar' : 'Activar');
+            state.vault.dirty = true;
+        });
+
+        acts.append(toggleBtn);
+
+        if (state.editor.active) {
+            const delBtn = mkB('<i class="fa-solid fa-trash-can"></i>', 'Eliminar', 'hover:text-[#e05a5a] hover:border-[#502020]');
+            delBtn.addEventListener('click', () => {
+                if (!confirm('Eliminar entrada "' + (entry.keys.join(', ') || '(sin claves)') + '"?')) return;
+                state.characterBook.entries.splice(i, 1);
+                state.vault.dirty = true;
+                renderLorebook();
+            });
+            acts.append(delBtn);
+        }
+
+        body.append(acts);
+
+        // Editor controls in head
+        if (state.editor.active) {
+            card.classList.add('editor-card');
+            const ctrl = document.createElement('div');
+            ctrl.className = 'editor-controls flex items-center gap-0.5 ml-1';
+            const mkC = (ic, t) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'editor-ctrl-btn'; b.innerHTML = '<i class="fa-solid ' + ic + '"></i>'; b.title = t; return b; };
+            const up = mkC('fa-caret-up', 'Arriba');
+            up.addEventListener('click', e => { e.stopPropagation(); moveLorebookEntry(i, -1); });
+            const dn = mkC('fa-caret-down', 'Abajo');
+            dn.addEventListener('click', e => { e.stopPropagation(); moveLorebookEntry(i, 1); });
+            ctrl.append(up, dn);
+            const ch = head.querySelector('.fa-chevron-down');
+            if (ch) ch.after(ctrl); else head.appendChild(ctrl);
+        }
+
+        card.append(head, body);
+        lv.appendChild(card);
+    });
+
+    if (state.editor.active) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-field-btn w-full flex items-center justify-center gap-3 py-6 text-text3 hover:text-editor transition-all animate-fade-in-up';
+        addBtn.style.animationDelay = entries.length * 0.05 + 's';
+        addBtn.innerHTML = '<i class="fa-solid fa-plus text-lg"></i> <span class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase">Agregar Entrada</span>';
+        addBtn.addEventListener('click', addLorebookEntry);
+        lv.appendChild(addBtn);
+    }
+
+    updLorebookCount();
 }

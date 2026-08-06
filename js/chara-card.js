@@ -3,6 +3,11 @@ import { $, deepClone, setNestedValue, deleteNestedValue, showToast } from './ut
 
 export function extractFields(obj) {
     state.file.extracted = {};
+    state.characterBook.entries = [];
+    state.altGreetings.original = '';
+    state.altGreetings.list = [];
+    state.altGreetings.current = 0;
+
     if (!obj || typeof obj !== 'object') return 0;
     let dup = 0;
 
@@ -43,12 +48,10 @@ export function extractFields(obj) {
     const dataRoot = obj.data && typeof obj.data === 'object' ? obj.data : obj;
     walk(dataRoot, '');
 
-    // FIX: correct condition — dataRoot !== obj
     if (Object.keys(state.file.extracted).length === 0 && dataRoot !== obj) {
         walk(obj, '');
     }
 
-    // Read extensions from data (spec V2) with fallback to root
     const ext = obj.data?.extensions ?? obj.extensions;
     if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
         const scr = ext.scriptorium;
@@ -64,6 +67,30 @@ export function extractFields(obj) {
             }
         }
     }
+
+    // Character Book
+    const bookSrc = dataRoot.character_book ?? obj.character_book;
+    if (bookSrc?.entries && Array.isArray(bookSrc.entries)) {
+        state.characterBook.entries = bookSrc.entries
+            .filter(e => e && typeof e === 'object')
+            .map(e => ({
+                keys: Array.isArray(e.keys) ? e.keys.filter(k => typeof k === 'string') : [],
+                content: String(e.content || ''),
+                enabled: e.enabled !== false,
+                insertion_order: typeof e.insertion_order === 'number' ? e.insertion_order : 0,
+                extensions: e.extensions && typeof e.extensions === 'object' ? JSON.parse(JSON.stringify(e.extensions)) : {}
+            }));
+    }
+
+    // Alternate Greetings
+    const altSrc = dataRoot.alternate_greetings ?? obj.alternate_greetings;
+    if (Array.isArray(altSrc) && altSrc.length > 0) {
+        state.altGreetings.list = altSrc.filter(g => typeof g === 'string' && g.trim());
+        const fmSrc = dataRoot.first_mes ?? obj.first_mes ?? '';
+        state.altGreetings.original = typeof fmSrc === 'string' ? fmSrc : '';
+        state.altGreetings.current = 0;
+    }
+
     return dup;
 }
 
@@ -87,7 +114,7 @@ export function buildExp() {
     card.spec_version = '2.0';
     card.data.name = cn;
 
-    // FIX: migrate legacy extensions from root into data
+    // Migrate legacy extensions
     const legacyScriptorium = card.extensions?.scriptorium;
     if (legacyScriptorium) {
         if (!card.data.extensions || typeof card.data.extensions !== 'object' || Array.isArray(card.data.extensions)) {
@@ -132,7 +159,6 @@ export function buildExp() {
         extFields[k] = { value: v, created: state.editor.added.has(k) };
     }
 
-    // Write extensions in data (spec V2)
     if (Object.keys(extFields).length > 0) {
         if (!card.data.extensions || typeof card.data.extensions !== 'object' || Array.isArray(card.data.extensions)) {
             card.data.extensions = {};
@@ -146,9 +172,31 @@ export function buildExp() {
         };
     }
 
-    // Clean empty extensions
     if (card.data.extensions?.scriptorium?.fields && Object.keys(card.data.extensions.scriptorium.fields).length === 0) {
         delete card.data.extensions.scriptorium.fields;
+    }
+
+    // Character Book
+    if (state.characterBook.entries.length > 0) {
+        card.data.character_book = {
+            entries: state.characterBook.entries.map(e => ({
+                keys: [...e.keys],
+                content: e.content,
+                enabled: e.enabled,
+                insertion_order: e.insertion_order,
+                extensions: JSON.parse(JSON.stringify(e.extensions || {}))
+            }))
+        };
+    }
+
+    // Alternate Greetings (swap-aware)
+    if (state.altGreetings.list.length > 0) {
+        const allGreetings = [state.altGreetings.original, ...state.altGreetings.list];
+        const current = state.altGreetings.current;
+        const rest = allGreetings.filter((_, i) => i !== current);
+        if (rest.length > 0) {
+            card.data.alternate_greetings = rest;
+        }
     }
 
     return card;

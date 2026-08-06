@@ -6,7 +6,6 @@ export const STORAGE_KEYS = {
 };
 
 export const VF = { SP: 'system_prompt_global', UP: 'mi_persona' };
-// FIX: VF son virtual fields que no van directo a data
 
 export const TARGET_FIELDS = [
     'description', 'personality', 'scenario', 'first_mes',
@@ -30,6 +29,8 @@ const state = {
     proc: { data: {}, edited: new Set() },
     editor: { active: false, added: new Set(), removed: new Set(), delKey: null, delTm: null },
     jsonEditor: { snap: null, dirty: false, err: null },
+    characterBook: { entries: [] },
+    altGreetings: { original: '', list: [], current: 0 },
     profiles: {
         active: 'default',
         lib: { default: { id: 'default', label: 'Perfil Inicial', name: '', persona: '', sp: '' } }
