@@ -1,6 +1,6 @@
 import state, { STORAGE_KEYS } from './state.js';
 import { $, Storage, showToast, trapFocus } from './utils.js';
-import { renderJSON, updJS, applyJE } from './editor.js';
+import { renderJSON, updJS, applyJE, updFab } from './editor.js';
 
 /* ─── Canvas ─── */
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -71,6 +71,8 @@ export function setActiveTab(id) {
     if (id === 'tabJson' && state.file.uploaded && !state.jsonEditor.dirty) renderJSON();
     const si = $('searchInput');
     if (si.value && id !== 'tabJson') si.dispatchEvent(new Event('input'));
+    // FIX: update FAB visibility when switching tabs
+    updFab();
 }
 
 export function initTabs() {
@@ -197,7 +199,7 @@ export function initExportModal() {
         showToast('Descargado');
     });
 
-    // FIX: PNG export listeners
+    // PNG export listeners
     $('exportPngInput')?.addEventListener('change', (e) => {
         const file = e.target.files?.[0];
         const nameEl = $('exportPngName');

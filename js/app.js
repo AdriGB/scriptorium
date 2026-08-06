@@ -44,6 +44,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         return;
     }
 
+    /* ── Profiles BEFORE vault session ── */
+    loadProfiles();
+    renderJSON();
+
     /* ── Vault init ── */
     let dbReady = false;
     try {
@@ -51,9 +55,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
         console.warn('Vault init fallo', e);
     }
-
-    // FIX: guardar sesion para restauracion diferida
-    let savedSession = null;
 
     if (dbReady) {
         vault.startAutoSave(() => state);
@@ -80,16 +81,28 @@ document.addEventListener('DOMContentLoaded', async () => {
                     state.proc.edited = new Set(saved.procEdited || []);
                     state.editor.added = new Set(saved.editorAdded || []);
                     state.editor.removed = new Set(saved.editorRemoved || []);
+
+                    // Restore profile AFTER loadProfiles already ran
+                    if (saved.activeProfileId && state.profiles.lib[saved.activeProfileId]) {
+                        state.profiles.active = saved.activeProfileId;
+                        renderSel();
+                    }
+
+                    // Set input values AFTER profile restoration (overwrites applyP)
                     if (saved.charName) charNameInput.value = saved.charName;
                     if (saved.userName) userNameInput.value = saved.userName;
                     if (saved.sysPrompt) sysPromptInput.value = saved.sysPrompt;
                     if (saved.userPersona) userPersonaInput.value = saved.userPersona;
+
                     processBtn.disabled = false;
                     processText();
-                    // FIX: marcar dirty=false despues de recuperar (no hay cambios nuevos)
                     state.vault.dirty = false;
-                    // FIX: guardar para restauracion diferida de perfil y editor
-                    savedSession = saved;
+
+                    // Restore editor state
+                    if (saved.editorActive && !state.editor.active) {
+                        togEd();
+                    }
+
                     showToast('Sesion recuperada');
                 } else {
                     await vault.clearSession();
@@ -120,7 +133,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (userNameInput?.value.trim() || sysPromptInput?.value.trim()) processText();
     });
 
-    // FIX: listener sincrono (sin dynamic import ni async)
     document.addEventListener('vault:request-card', (e) => {
         try {
             e.detail.card = buildExp();
@@ -130,29 +142,18 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    /* ── Profiles ── */
-    loadProfiles();
-    renderJSON();
-
-    // FIX: restaurar perfil y editor DESPUES de loadProfiles
-    if (savedSession) {
-        if (savedSession.activeProfileId && state.profiles.lib[savedSession.activeProfileId]) {
-            state.profiles.active = savedSession.activeProfileId;
-            renderSel();
-            applyP();
-        }
-        if (savedSession.editorActive && !state.editor.active) {
-            togEd();
-        }
-    }
-
+    /* ── Profile buttons ── */
     $('saveProfileBtn')?.addEventListener('click', saveCurP);
     $('newProfileBtn')?.addEventListener('click', newPrf);
     $('deleteProfileBtn')?.addEventListener('click', delCurP);
     $('profileSelect')?.addEventListener('change', chgP);
     $('profileLabelInput')?.addEventListener('input', updLbl);
-    charNameInput?.addEventListener('input', updLP);
-    userNameInput?.addEventListener('input', updLP);
+
+    // FIX: config inputs mark dirty + update labels
+    charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
+    userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
+    sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; });
+    userPersonaInput?.addEventListener('input', () => { state.vault.dirty = true; });
 
     /* ── File handling ── */
     function setStatus(msg, type, html) {
@@ -303,7 +304,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // FIX: beforeunload depende de dirty, no de datos presentes
+    // FIX: beforeunload depends on dirty, not on data presence
     window.addEventListener('beforeunload', (e) => {
         if (!state.vault.dirty) return;
         e.preventDefault();

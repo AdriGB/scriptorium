@@ -12,9 +12,7 @@ export function extractFields(obj) {
         if (!o || typeof o !== 'object') return;
         if (seenObjects.has(o)) return;
         seenObjects.add(o);
-        if (Array.isArray(o)) {
-            return;
-        }
+        if (Array.isArray(o)) return;
         for (const k in o) {
             if (!Object.prototype.hasOwnProperty.call(o, k)) continue;
             if (RESERVED_KEYS.has(k.toLowerCase())) continue;
@@ -45,11 +43,12 @@ export function extractFields(obj) {
     const dataRoot = obj.data && typeof obj.data === 'object' ? obj.data : obj;
     walk(dataRoot, '');
 
-    if (Object.keys(state.file.extracted).length === 0 && obj.data !== dataRoot) {
+    // FIX: correct condition — dataRoot !== obj
+    if (Object.keys(state.file.extracted).length === 0 && dataRoot !== obj) {
         walk(obj, '');
     }
 
-    // FIX: buscar extensions en data.extensions (spec V2) y fallback a raiz
+    // Read extensions from data (spec V2) with fallback to root
     const ext = obj.data?.extensions ?? obj.extensions;
     if (ext && typeof ext === 'object' && !Array.isArray(ext)) {
         const scr = ext.scriptorium;
@@ -88,11 +87,30 @@ export function buildExp() {
     card.spec_version = '2.0';
     card.data.name = cn;
 
+    // FIX: migrate legacy extensions from root into data
+    const legacyScriptorium = card.extensions?.scriptorium;
+    if (legacyScriptorium) {
+        if (!card.data.extensions || typeof card.data.extensions !== 'object' || Array.isArray(card.data.extensions)) {
+            card.data.extensions = {};
+        }
+        const existingDataScr = card.data.extensions.scriptorium && typeof card.data.extensions.scriptorium === 'object' ? card.data.extensions.scriptorium : {};
+        const existingDataFields = existingDataScr.fields && typeof existingDataScr.fields === 'object' ? existingDataScr.fields : {};
+        const legacyFields = legacyScriptorium.fields && typeof legacyScriptorium.fields === 'object' ? legacyScriptorium.fields : {};
+        card.data.extensions.scriptorium = {
+            ...existingDataScr,
+            version: legacyScriptorium.version || existingDataScr.version || 1,
+            fields: { ...legacyFields, ...existingDataFields }
+        };
+        delete card.extensions.scriptorium;
+        if (Object.keys(card.extensions).length === 0) {
+            delete card.extensions;
+        }
+    }
+
     // Removidos
     for (const key of state.editor.removed) {
         try {
             deleteNestedValue(card.data, key);
-            // FIX: eliminar de data.extensions (spec V2)
             if (card.data?.extensions?.scriptorium?.fields?.[key] !== undefined) {
                 delete card.data.extensions.scriptorium.fields[key];
             }
@@ -114,7 +132,7 @@ export function buildExp() {
         extFields[k] = { value: v, created: state.editor.added.has(k) };
     }
 
-    // FIX: escribir extensions dentro de data (spec V2)
+    // Write extensions in data (spec V2)
     if (Object.keys(extFields).length > 0) {
         if (!card.data.extensions || typeof card.data.extensions !== 'object' || Array.isArray(card.data.extensions)) {
             card.data.extensions = {};
@@ -128,7 +146,7 @@ export function buildExp() {
         };
     }
 
-    // FIX: limpiar extensions vacias en data
+    // Clean empty extensions
     if (card.data.extensions?.scriptorium?.fields && Object.keys(card.data.extensions.scriptorium.fields).length === 0) {
         delete card.data.extensions.scriptorium.fields;
     }
