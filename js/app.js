@@ -86,13 +86,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                     if (saved.activeProfileId && state.profiles.lib[saved.activeProfileId]) {
                         state.profiles.active = saved.activeProfileId;
                         renderSel();
+                        applyP();
                     }
 
-                    // Set input values AFTER profile restoration (overwrites applyP)
-                    if (saved.charName) charNameInput.value = saved.charName;
-                    if (saved.userName) userNameInput.value = saved.userName;
-                    if (saved.sysPrompt) sysPromptInput.value = saved.sysPrompt;
-                    if (saved.userPersona) userPersonaInput.value = saved.userPersona;
+                    // Unconditional assignment — overwrites profile values with exact session values
+                    charNameInput.value = saved.charName ?? '';
+                    userNameInput.value = saved.userName ?? '';
+                    sysPromptInput.value = saved.sysPrompt ?? '';
+                    userPersonaInput.value = saved.userPersona ?? '';
 
                     processBtn.disabled = false;
                     processText();
@@ -149,7 +150,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('profileSelect')?.addEventListener('change', chgP);
     $('profileLabelInput')?.addEventListener('input', updLbl);
 
-    // FIX: config inputs mark dirty + update labels
+    // Config inputs mark dirty + update labels
     charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
     userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; });
     sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; });
@@ -194,7 +195,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetCardState();
         const dup = extractFields(state.file.uploaded);
         const count = Object.keys(getExtracted()).length;
-        if (count === 0) return setStatus('Tomo vacio - sin campos compatibles.', 'error');
+        if (count === 0) {
+            processBtn.disabled = true;
+            if (rawCount) rawCount.textContent = '0';
+            const pc = $('processedCount');
+            if (pc) pc.textContent = '0';
+            const rv = $('rawView');
+            if (rv) rv.replaceChildren();
+            const pv = $('processedView');
+            if (pv) pv.innerHTML = '<p class="text-text3 italic text-center py-12">No se encontraron campos compatibles.</p>';
+            renderJSON();
+            updFab();
+            return setStatus('Tomo vacio: no contiene campos compatibles.', 'error');
+        }
         const nm = state.file.uploaded.name || state.file.uploaded.data?.name || state.file.uploaded.char_name || '';
         if (nm && charNameInput) { charNameInput.value = nm; updLP(); }
         let msg = '✓ ' + fn + ' - ' + count + ' campo(s).';
@@ -304,7 +317,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // FIX: beforeunload depends on dirty, not on data presence
+    // Beforeunload depends on dirty, not on data presence
     window.addEventListener('beforeunload', (e) => {
         if (!state.vault.dirty) return;
         e.preventDefault();
