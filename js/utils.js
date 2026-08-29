@@ -4,6 +4,20 @@ import { RESERVED_KEYS } from './state.js';
 
 export const $ = (id) => document.getElementById(id);
 
+/* Contenedor de campos visible, o null si esta activo el JSON.
+   Vive aqui y no en ui.js porque lo consumen tanto el buscador como el indice de
+   la scrollbar, y este modulo es hoja: importarlo desde cualquier parte no crea
+   ciclos entre editor.js y ui.js. */
+export function activeFieldView() {
+    const json = $('jsonView');
+    if (json && !json.classList.contains('hidden')) return null;
+    const processed = $('processedView');
+    if (processed && !processed.classList.contains('hidden')) return processed;
+    const raw = $('rawView');
+    if (raw && !raw.classList.contains('hidden')) return raw;
+    return $('lorebookView');
+}
+
 export const sanitizeKey = (raw) => {
     if (!raw || typeof raw !== 'string') return '';
     return raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 64).replace(/^_+|_+$/g, '');

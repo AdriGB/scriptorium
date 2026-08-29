@@ -8,6 +8,7 @@ import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, a
 import { processText, renderRaw, renderProc, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount, emptyFieldsState } from './editor.js';
 import { openExpModal, closeExpModal, copyAll } from './export.js';
 import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor, initConfirmModal, initFocusTraps, initShortcutsModal, initWelcome, closeShortcuts } from './ui.js';
+import { initFieldIndex } from './field-index.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
@@ -15,6 +16,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initCanvas(); initSidebar(); initTabs(); initSearch(); initAbout();
         initExpandModal(); initAddFieldModal(); initExportModal(); initJsonEditor();
         initConfirmModal(); initFocusTraps(); initShortcutsModal(); initWelcome();
+        initFieldIndex();
     } catch (err) { console.error('[Init] error:', err); }
 
     const fileInput = $('dropzone-file');

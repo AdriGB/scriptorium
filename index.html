@@ -82,6 +82,22 @@
         #leftPanel button{font-size:.75rem}
         #leftPanel .font-cinzel{letter-spacing:.06em}
         @media(max-width:640px){.json-tree-leaf{grid-template-columns:minmax(6rem,9rem) minmax(10rem,1fr)}}
+        /* Indice de campos: minimapa sobre la scrollbar. Se revela al acercar el
+           raton al borde derecho, para no estorbar cuando no se usa. El rail es
+           hermano del contenedor de scroll: si estuviera dentro, se iria con el. */
+        /* right:7px deja el rail pegado a la scrollbar (que mide 6px) sin taparla. */
+        #fieldIndex{position:absolute;top:6px;right:7px;bottom:6px;width:26px;display:flex;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:20}
+        #fieldIndex[hidden]{display:none}
+        #fieldIndex.is-visible{opacity:1;pointer-events:auto}
+        #fieldIndex .fi-track{position:relative;width:7px;height:100%;border-radius:4px;background:rgba(10,11,20,.55);box-shadow:inset 0 0 0 1px rgba(54,58,106,.5)}
+        #fieldIndex .fi-viewport{position:absolute;left:0;right:0;border-radius:4px;background:rgba(201,168,76,.14);box-shadow:inset 0 0 0 1px rgba(201,168,76,.3);pointer-events:none}
+        #fieldIndex .fi-tick{position:absolute;left:0;width:7px;border:none;padding:0;border-radius:2px;background:#4a4f7a;cursor:pointer;transition:background-color .15s,transform .15s}
+        #fieldIndex .fi-tick:hover{background:#a89b6a;transform:scaleX(1.6)}
+        #fieldIndex .fi-tick.is-active{background:#c9a84c;transform:scaleX(1.6)}
+        #fieldIndex .fi-tick:focus-visible{outline:2px solid #e8cc80;outline-offset:2px}
+        #fieldIndex .fi-tip{position:absolute;right:36px;max-width:220px;padding:.25rem .5rem;border-radius:6px;background:#12142a;border:1px solid #252848;color:#e8cc80;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;opacity:0;transition:opacity .15s}
+        #fieldIndex .fi-tip.is-visible{opacity:1}
+        @media(max-width:767.98px){#fieldIndex{display:none}}
     </style>
 </head>
 <body class="font-crimson h-[100dvh] flex flex-col overflow-hidden selection:bg-violetDim selection:text-text1">
@@ -164,41 +180,44 @@
                 <span><i class="fa-solid fa-book-atlas mr-1"></i><span id="statusLorebook">0 entradas de lorebook</span></span>
             </div>
             <div id="editorInfoBar" class="editor-bar hidden px-4 md:px-8 py-2 items-center gap-2 text-[0.7rem] text-editor font-cinzel tracking-wide shrink-0"><i class="fa-solid fa-pen-ruler"></i><span>Modo editor</span><div class="flex-1"></div><span class="text-text3 font-crimson italic tracking-normal">Ctrl+E para salir</span></div>
-            <div id="resultsArea" class="flex-1 overflow-y-auto scrollbar-custom p-4 md:p-8 relative">
-                <div id="workspaceEmpty" class="flex flex-col h-full min-h-[55vh] items-center justify-center gap-6 px-4">
-                    <div id="welcomePanel" class="hidden w-full max-w-xl rounded-2xl border border-border1 bg-surface/60 px-6 py-5">
-                        <div class="flex items-start gap-3">
-                            <i class="fa-solid fa-compass text-goldDim text-base mt-0.5 shrink-0"></i>
-                            <div class="flex-1 min-w-0">
-                                <h3 class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase text-gold mb-2">Como funciona</h3>
-                                <ol class="font-crimson text-sm text-text2 leading-relaxed space-y-1.5 list-decimal list-inside">
-                                    <li>Carga un <strong class="text-text1">JSON</strong> o un <strong class="text-text1">PNG</strong> con metadatos CharaCardV2.</li>
-                                    <li>Escribe el nombre del personaje y el tuyo en el panel izquierdo.</li>
-                                    <li>Pulsa <strong class="text-text1">Invocar y Sustituir</strong> para reemplazar <span class="tag-char">{{char}}</span> y <span class="tag-user">{{user}}</span>.</li>
-                                </ol>
-                                <p class="font-crimson text-xs text-text3/80 italic mt-3"><i class="fa-solid fa-lock mr-1"></i>Nada sale de este dispositivo.</p>
+            <div class="relative flex-1 min-h-0 flex">
+                <div id="resultsArea" class="flex-1 overflow-y-auto scrollbar-custom p-4 md:p-8 relative">
+                    <div id="workspaceEmpty" class="flex flex-col h-full min-h-[55vh] items-center justify-center gap-6 px-4">
+                        <div id="welcomePanel" class="hidden w-full max-w-xl rounded-2xl border border-border1 bg-surface/60 px-6 py-5">
+                            <div class="flex items-start gap-3">
+                                <i class="fa-solid fa-compass text-goldDim text-base mt-0.5 shrink-0"></i>
+                                <div class="flex-1 min-w-0">
+                                    <h3 class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase text-gold mb-2">Como funciona</h3>
+                                    <ol class="font-crimson text-sm text-text2 leading-relaxed space-y-1.5 list-decimal list-inside">
+                                        <li>Carga un <strong class="text-text1">JSON</strong> o un <strong class="text-text1">PNG</strong> con metadatos CharaCardV2.</li>
+                                        <li>Escribe el nombre del personaje y el tuyo en el panel izquierdo.</li>
+                                        <li>Pulsa <strong class="text-text1">Invocar y Sustituir</strong> para reemplazar <span class="tag-char">{{char}}</span> y <span class="tag-user">{{user}}</span>.</li>
+                                    </ol>
+                                    <p class="font-crimson text-xs text-text3/80 italic mt-3"><i class="fa-solid fa-lock mr-1"></i>Nada sale de este dispositivo.</p>
+                                </div>
+                                <button id="welcomeDismiss" type="button" title="No mostrar de nuevo" aria-label="No mostrar de nuevo" class="text-text3 hover:text-text1 transition-colors shrink-0"><i class="fa-solid fa-xmark"></i></button>
                             </div>
-                            <button id="welcomeDismiss" type="button" title="No mostrar de nuevo" aria-label="No mostrar de nuevo" class="text-text3 hover:text-text1 transition-colors shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div id="centerDropzone" class="dropzone-anim relative w-full max-w-xl overflow-hidden rounded-2xl border-2 border-dashed border-border2 bg-surface/60 px-8 py-12 text-center transition-all">
+                            <div class="relative z-10"><i class="fa-solid fa-file-arrow-up text-4xl text-goldDim mb-5"></i><h2 class="font-cinzel text-lg text-gold2 mb-2">Arrastra una carta aqui</h2><p class="text-text3 mb-6">JSON o PNG con metadatos · maximo 10 MB</p><div class="flex flex-col sm:flex-row items-center justify-center gap-3"><label for="dropzone-file" class="cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg hover:brightness-110 transition-all"><i class="fa-solid fa-folder-open mr-2"></i>Seleccionar archivo</label><button id="emptyVaultBtn" type="button" class="rounded-lg border border-border1 px-5 py-2.5 text-sm text-text2 hover:border-goldDim hover:text-gold transition-all"><i class="fa-solid fa-box-archive mr-2"></i>Abrir desde la boveda</button></div><p class="mt-5 text-xs text-text3/70"><i class="fa-solid fa-lock mr-1"></i>El procesamiento se realiza en este dispositivo.</p></div>
                         </div>
                     </div>
-                    <div id="centerDropzone" class="dropzone-anim relative w-full max-w-xl overflow-hidden rounded-2xl border-2 border-dashed border-border2 bg-surface/60 px-8 py-12 text-center transition-all">
-                        <div class="relative z-10"><i class="fa-solid fa-file-arrow-up text-4xl text-goldDim mb-5"></i><h2 class="font-cinzel text-lg text-gold2 mb-2">Arrastra una carta aqui</h2><p class="text-text3 mb-6">JSON o PNG con metadatos · maximo 10 MB</p><div class="flex flex-col sm:flex-row items-center justify-center gap-3"><label for="dropzone-file" class="cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg hover:brightness-110 transition-all"><i class="fa-solid fa-folder-open mr-2"></i>Seleccionar archivo</label><button id="emptyVaultBtn" type="button" class="rounded-lg border border-border1 px-5 py-2.5 text-sm text-text2 hover:border-goldDim hover:text-gold transition-all"><i class="fa-solid fa-box-archive mr-2"></i>Abrir desde la boveda</button></div><p class="mt-5 text-xs text-text3/70"><i class="fa-solid fa-lock mr-1"></i>El procesamiento se realiza en este dispositivo.</p></div>
+                    <div id="workspaceViews" class="hidden h-full">
+                    <div id="processedView" role="tabpanel" class="space-y-4"><div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan ser escritas.</p></div></div>
+                    <div id="rawView" role="tabpanel" class="hidden space-y-4"></div>
+                    <div id="jsonView" role="tabpanel" class="hidden flex flex-col h-full">
+                        <div id="jsonEditorEmpty" class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 mb-4"><i class="fa-solid fa-code text-text3"></i></div><p class="text-text3 italic max-w-sm text-sm">Carga un tomo primero.</p></div>
+                        <div id="jsonEditorActive" class="hidden flex flex-col h-full">
+                            <div class="flex flex-wrap items-center gap-3 mb-3 shrink-0"><div class="flex items-center gap-2 text-xs font-cinzel tracking-wide text-text3"><i class="fa-solid fa-brackets-curly text-goldDim"></i><span>JSON del tomo</span></div><div class="inline-flex rounded-lg border border-border1 bg-bg p-1"><button id="jsonTreeModeBtn" type="button" class="json-mode-btn active px-3 py-1 rounded-md text-xs" aria-pressed="true"><i class="fa-solid fa-folder-tree"></i> Arbol</button><button id="jsonRawModeBtn" type="button" class="json-mode-btn px-3 py-1 rounded-md text-xs" aria-pressed="false"><i class="fa-solid fa-code"></i> Codigo</button></div><div class="h-px flex-1 bg-gradient-to-r from-border1 to-transparent"></div><div id="jsonCodeActions" class="hidden flex items-center gap-2"><button id="jsonFormatBtn" type="button" class="text-text3 hover:text-editor text-xs px-2 py-1 rounded border border-border1 hover:border-editor/30 transition-all"><i class="fa-solid fa-wand-magic-sparkles"></i> Formatear</button><button id="jsonResetBtn" type="button" class="text-text3 hover:text-gold text-xs px-2 py-1 rounded border border-border1 hover:border-goldDim transition-all"><i class="fa-solid fa-rotate-left"></i> Revertir</button><button id="jsonApplyBtn" type="button" class="text-bg bg-editor hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-xs px-3 py-1 rounded"><i class="fa-solid fa-check"></i> Aplicar</button></div></div>
+                            <div id="jsonTreeView" class="flex-1 overflow-auto scrollbar-custom rounded-lg border border-border1 bg-[#0a0b14] px-3"></div>
+                            <div id="jsonRawView" class="hidden flex-1 relative min-h-0"><textarea id="jsonEditorTextarea" spellcheck="false" class="w-full h-full bg-[#0a0b14] border border-border1 rounded-lg p-4 text-text1 outline-none transition-all scrollbar-custom"></textarea></div>
+                            <div id="jsonStatusBar" class="json-status-bar mt-2 px-3 py-1.5 rounded-lg flex items-center justify-between text-[0.65rem] font-crimson shrink-0"><div class="flex items-center gap-3"><span id="jsonStatusLine" class="text-editor flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-[0.5rem]"></i> JSON valido</span><span id="jsonStatusFields" class="text-text3"></span></div><div class="flex items-center gap-3 text-text3"><span id="jsonStatusSize"></span><span class="hidden md:inline italic">Ctrl+Shift+Enter</span></div></div>
+                        </div>
+                    </div>
+                    <div id="lorebookView" role="tabpanel" class="hidden space-y-4"><div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 mb-4"><i class="fa-solid fa-book-atlas text-text3"></i></div><p class="text-text3 italic max-w-sm text-sm">Sin entradas de lorebook.</p><p class="text-text3/60 text-xs mt-2">Carga un tomo con character_book o activa el editor para crear entradas.</p></div></div>
                     </div>
                 </div>
-                <div id="workspaceViews" class="hidden h-full">
-                <div id="processedView" role="tabpanel" class="space-y-4"><div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan ser escritas.</p></div></div>
-                <div id="rawView" role="tabpanel" class="hidden space-y-4"></div>
-                <div id="jsonView" role="tabpanel" class="hidden flex flex-col h-full">
-                    <div id="jsonEditorEmpty" class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 mb-4"><i class="fa-solid fa-code text-text3"></i></div><p class="text-text3 italic max-w-sm text-sm">Carga un tomo primero.</p></div>
-                    <div id="jsonEditorActive" class="hidden flex flex-col h-full">
-                        <div class="flex flex-wrap items-center gap-3 mb-3 shrink-0"><div class="flex items-center gap-2 text-xs font-cinzel tracking-wide text-text3"><i class="fa-solid fa-brackets-curly text-goldDim"></i><span>JSON del tomo</span></div><div class="inline-flex rounded-lg border border-border1 bg-bg p-1"><button id="jsonTreeModeBtn" type="button" class="json-mode-btn active px-3 py-1 rounded-md text-xs" aria-pressed="true"><i class="fa-solid fa-folder-tree"></i> Arbol</button><button id="jsonRawModeBtn" type="button" class="json-mode-btn px-3 py-1 rounded-md text-xs" aria-pressed="false"><i class="fa-solid fa-code"></i> Codigo</button></div><div class="h-px flex-1 bg-gradient-to-r from-border1 to-transparent"></div><div id="jsonCodeActions" class="hidden flex items-center gap-2"><button id="jsonFormatBtn" type="button" class="text-text3 hover:text-editor text-xs px-2 py-1 rounded border border-border1 hover:border-editor/30 transition-all"><i class="fa-solid fa-wand-magic-sparkles"></i> Formatear</button><button id="jsonResetBtn" type="button" class="text-text3 hover:text-gold text-xs px-2 py-1 rounded border border-border1 hover:border-goldDim transition-all"><i class="fa-solid fa-rotate-left"></i> Revertir</button><button id="jsonApplyBtn" type="button" class="text-bg bg-editor hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed text-xs px-3 py-1 rounded"><i class="fa-solid fa-check"></i> Aplicar</button></div></div>
-                        <div id="jsonTreeView" class="flex-1 overflow-auto scrollbar-custom rounded-lg border border-border1 bg-[#0a0b14] px-3"></div>
-                        <div id="jsonRawView" class="hidden flex-1 relative min-h-0"><textarea id="jsonEditorTextarea" spellcheck="false" class="w-full h-full bg-[#0a0b14] border border-border1 rounded-lg p-4 text-text1 outline-none transition-all scrollbar-custom"></textarea></div>
-                        <div id="jsonStatusBar" class="json-status-bar mt-2 px-3 py-1.5 rounded-lg flex items-center justify-between text-[0.65rem] font-crimson shrink-0"><div class="flex items-center gap-3"><span id="jsonStatusLine" class="text-editor flex items-center gap-1.5"><i class="fa-solid fa-circle-check text-[0.5rem]"></i> JSON valido</span><span id="jsonStatusFields" class="text-text3"></span></div><div class="flex items-center gap-3 text-text3"><span id="jsonStatusSize"></span><span class="hidden md:inline italic">Ctrl+Shift+Enter</span></div></div>
-                    </div>
-                </div>
-                <div id="lorebookView" role="tabpanel" class="hidden space-y-4"><div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 mb-4"><i class="fa-solid fa-book-atlas text-text3"></i></div><p class="text-text3 italic max-w-sm text-sm">Sin entradas de lorebook.</p><p class="text-text3/60 text-xs mt-2">Carga un tomo con character_book o activa el editor para crear entradas.</p></div></div>
-                </div>
+                <div id="fieldIndex" role="navigation" aria-label="Indice de campos" hidden></div>
             </div>
             <div id="fabContainer" class="hidden flex shrink-0 border-t border-border1 bg-bg2/95 backdrop-blur px-4 md:px-6 py-3 items-center justify-end gap-3">
                 <button id="copyAllBtn" class="rounded-lg border border-border1 px-4 py-2 text-sm text-text2 hover:border-goldDim hover:text-gold transition-all"><i class="fa-regular fa-copy mr-2"></i>Copiar todo</button>

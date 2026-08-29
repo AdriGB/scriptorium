@@ -229,6 +229,54 @@ assert.ok(highlight(excerpt, 'dragon').includes('<mark class="search-hit">dragon
 assert.equal(buildExcerpt({ card: { data: {} } }, 'x'), '');
 assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
 
+/* ── Indice de la scrollbar ──
+   Funcion pura que reparte las marcas por el rail. Es donde se cuelan los dos
+   fallos tipicos: marcas de altura cero en los campos cortos, y solapes cuando
+   la altura minima y los huecos se acumulan. */
+const { computeTicks } = await import(new URL('../js/field-index.js', import.meta.url));
+
+const RAIL = 200;
+const tickSets = [
+    ['proporcional', [
+        { key: 'a', label: 'Nombre', top: 0, height: 100 },
+        { key: 'b', label: 'Descripcion', top: 100, height: 800 },
+        { key: 'c', label: 'Saludo', top: 900, height: 100 },
+    ], 1000],
+    // Un campo que se come el 99% del contenido y dos de una linea: el caso que
+    // solapaba marcas al aplicar la altura minima sin descontar antes los huecos.
+    ['campo gigante', [
+        { key: 'a', label: 'A', top: 0, height: 2 },
+        { key: 'b', label: 'B', top: 2, height: 2 },
+        { key: 'c', label: 'C', top: 4, height: 994 },
+    ], 1000],
+    ['muchos campos', Array.from({ length: 50 }, (_, i) => ({ key: 'k' + i, label: 'Campo ' + i, top: i * 100, height: 100 })), 5000],
+];
+
+for (const [name, items, total] of tickSets) {
+    const ticks = computeTicks(items, total, RAIL);
+    assert.equal(ticks.length, items.length, name + ': una marca por campo');
+    // La proporcion entre campos se conserva: es justo lo que el rail comunica.
+    const ratio = ticks[1].height / ticks[0].height;
+    assert.ok(Math.abs(ratio - items[1].height / items[0].height) < 0.05, name + ': proporcion alterada');
+    ticks.forEach((tick, i) => {
+        assert.ok(tick.top >= 0, name + ': la marca ' + i + ' se sale por arriba');
+        assert.ok(tick.top + tick.height <= RAIL + 0.01, name + ': la marca ' + i + ' se sale por abajo');
+        assert.ok(tick.height > 0, name + ': la marca ' + i + ' no tiene altura');
+        if (i > 0) {
+            assert.ok(tick.top >= ticks[i - 1].top + ticks[i - 1].height - 1e-9,
+                name + ': solape entre las marcas ' + (i - 1) + ' y ' + i);
+        }
+    });
+}
+// Cada marca conserva la identidad de su campo: es lo que hace que el clic
+// salte al sitio correcto incluso despues de reordenar por posicion.
+assert.deepEqual(computeTicks(tickSets[0][1], 1000, RAIL).map(t => t.label),
+    ['Nombre', 'Descripcion', 'Saludo']);
+
+assert.deepEqual(computeTicks([], 1000, RAIL), [], 'Sin campos no hay marcas');
+assert.deepEqual(computeTicks(tickSets[0][1], 0, RAIL), [], 'Sin contenido no hay marcas');
+assert.deepEqual(computeTicks(tickSets[0][1], 1000, 0), [], 'Rail sin alto no pinta marcas');
+
 /* ─── Elementos muertos ───
    Un id en el HTML que nadie referencia es UI muerta. Asi llevaban tiempo el modal
    de atajos (boton y tecla "?" sin cablear) y el panel de bienvenida: completos en

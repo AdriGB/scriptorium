@@ -1,6 +1,7 @@
 import state, { STORAGE_KEYS } from './state.js';
-import { $, Storage, showToast, trapFocus, closeConfirmDialog } from './utils.js';
+import { $, Storage, showToast, trapFocus, closeConfirmDialog, activeFieldView } from './utils.js';
 import { renderJSON, updJS, applyJE, updFab, renderLorebook, setJsonMode } from './editor.js';
+import { refreshFieldIndex } from './field-index.js';
 
 /* ─── Canvas ─── */
 const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -92,6 +93,9 @@ export function setActiveTab(id) {
     if (id === 'tabLorebook') renderLorebook();
     const si = $('searchInput');
     if (si.value && id !== 'tabJson') si.dispatchEvent(new Event('input'));
+    // Cada pestana indexa campos distintos (y el JSON ninguno): recalcular tambien
+    // cuando no hay busqueda activa, que es justo cuando no llega otro aviso.
+    refreshFieldIndex();
     updFab();
 }
 
@@ -187,11 +191,9 @@ export function initSearch() {
         [$('processedView'), $('rawView'), $('lorebookView')].forEach(v => v && clearHighlights(v));
 
         // El JSON es un editor de texto: el filtro por tarjetas no aplica ahi.
-        if (!$('jsonView').classList.contains('hidden')) return;
+        const av = activeFieldView();
+        if (!av) return;
 
-        const av = !$('processedView').classList.contains('hidden') ? $('processedView')
-            : !$('rawView').classList.contains('hidden') ? $('rawView')
-                : $('lorebookView');
         const cards = [...av.querySelectorAll('.field-card')];
         let vc = 0;
         cards.forEach(c => {
@@ -201,6 +203,9 @@ export function initSearch() {
         });
         updNR(q, vc, av);
         setCounter(q, vc, cards.length);
+        // Filtrar cambia que campos quedan visibles y sus altos: el indice de la
+        // scrollbar debe recalcularse con el mismo criterio.
+        refreshFieldIndex();
     }
 
     searchInput.addEventListener('input', runSearch);
