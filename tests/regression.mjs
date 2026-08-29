@@ -422,6 +422,24 @@ const editorSrc = await readFile(new URL('../js/editor.js', import.meta.url), 'u
 assert.ok(/label:\s*'Deshacer'/.test(editorSrc), 'El aviso de la sustitucion no ofrece deshacer');
 assert.ok(/function restoreProcessed/.test(editorSrc), 'Falta la funcion que deshace la sustitucion');
 
+/* La traduccion se mostraba como referencia y no habia forma de volcarla al
+   campo: se leia y se copiaba a mano. Son cuatro piezas, en la tarjeta y en el
+   modal expandido: la escritura comun, la aplicacion con deshacer y el volcado
+   desde el modal. Si alguien borra el boton del HTML lo caza el control de ids
+   muertos de mas arriba; si lo deja sin cablear, el mismo control. */
+assert.ok(/function writeFieldText\(/.test(editorSrc), 'Falta la escritura comun de un campo');
+assert.ok(/function applyTranslation\(/.test(editorSrc), 'Falta la funcion que aplica la traduccion');
+assert.ok(/function applyExpandedTranslation\(/.test(editorSrc), 'Falta el volcado de la traduccion del modal');
+assert.match(indexSource, /id="expandModalApplyBtn"/, 'Falta el boton de aplicar en el modal expandido');
+/* Aplicar reemplaza el campo entero, asi que se deshace como el resto de los
+   rituales. Y la vuelta atras tiene que devolver tambien la insignia "editado":
+   si el campo estaba intacto, dejarla puesta haria que el siguiente "Invocar y
+   sustituir" respetara un texto que el usuario no escribio. */
+const applyBody = editorSrc.match(/function applyTranslation\([\s\S]*?\n\}/);
+assert.ok(applyBody, 'No se encuentra el cuerpo de applyTranslation');
+assert.match(applyBody[0], /Deshacer/, 'Aplicar la traduccion no ofrece deshacer');
+assert.match(applyBody[0], /proc\.edited\.delete/, 'Deshacer no devuelve la insignia de editado');
+
 const undefinedIdents = [];
 for (const file of jsFiles) {
     const src = await readFile(new URL(file, jsDir), 'utf8');

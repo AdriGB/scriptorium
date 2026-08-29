@@ -132,6 +132,45 @@ function setCardMarkers(mk, text) {
         : `Quedan ${n} marcadores literales: rellena el nombre y vuelve a invocar`;
 }
 
+/* Escribe un texto en un campo ya procesado desde fuera del contenteditable.
+   Lleva la misma contabilidad que la edicion a mano (datos, peso, insignias y
+   boveda sucia); `els` son los nodos de la tarjeta que hay que repintar, y se
+   admiten vacios porque desde el modal expandido solo se conocen unos cuantos. */
+function writeFieldText(key, text, els = {}) {
+    state.proc.data[key] = text;
+    state.proc.edited.add(key);
+    state.vault.dirty = true;
+    if (els.ce) els.ce.textContent = text;
+    if (els.cc) setCardStats(els.cc, text);
+    scheduleWeight();
+    refreshCardBadges();
+}
+
+/* ─── Aplicar la traduccion ───
+   La traduccion se mostraba solo como referencia y no habia forma de volcarla al
+   campo: se leia y se copiaba a mano. Se aplica con deshacer, igual que "Limpiar
+   todo" e "Invocar y sustituir". Devuelve false si no habia nada que aplicar. */
+export function applyTranslation(key, text, els = {}) {
+    const prev = state.proc.data[key] ?? '';
+    /* Sin texto o sin cambios: el boton no puede quedarse mudo, que es justo el
+       callejon sin salida que se esta resolviendo. */
+    if (!text || text === prev) { showToast('Nada que aplicar', 'info'); return false; }
+    const wasEdited = state.proc.edited.has(key);
+    writeFieldText(key, text, els);
+    showToast('Traduccion aplicada', 'success', {
+        label: 'Deshacer',
+        onClick: () => {
+            writeFieldText(key, prev, els);
+            // Si el campo estaba intacto, la vuelta atras lo deja intacto: la
+            // insignia "editado" no es cierta y el siguiente ritual la respeta.
+            if (!wasEdited) state.proc.edited.delete(key);
+            refreshCardBadges();
+            showToast('Traduccion descartada', 'info');
+        }
+    });
+    return true;
+}
+
 /* ─── Create card ─── */
 export function createCard(key, text, isRaw) {
     const card = document.createElement('div');
@@ -188,10 +227,11 @@ export function createCard(key, text, isRaw) {
 
     let tC = null, tA = null;
     const tB = document.createElement('div'); tB.className = 'hidden mt-3 pt-3 border-t border-dashed border-violetDim/50';
-    const tL = document.createElement('p'); tL.className = 'text-[0.6rem] font-cinzel tracking-widest uppercase text-violet2 mb-1.5';
+    const tH = document.createElement('div'); tH.className = 'flex items-center gap-2 mb-1.5';
+    const tL = document.createElement('p'); tL.className = 'text-[0.6rem] font-cinzel tracking-widest uppercase text-violet2 flex-1';
     tL.innerHTML = '<i class="fa-solid fa-language"></i> Traduccion';
     const tX = document.createElement('div'); tX.className = 'font-crimson text-base text-text2 italic whitespace-pre-wrap leading-[1.7]';
-    tB.append(tL, tX);
+    tB.append(tH, tX); tH.append(tL);
 
     if (!isRaw) ce.addEventListener('input', e => {
         state.proc.data[key] = e.target.innerText;
@@ -237,6 +277,17 @@ export function createCard(key, text, isRaw) {
         } catch (err) { if (err.name === 'AbortError') return; tB.classList.add('hidden'); showToast('Error', 'error'); }
         finally { trB.disabled = false; }
     });
+
+    /* Aplicar: la traduccion deja de ser una referencia de lectura y pasa al
+       campo. En la vista original no se ofrece, porque ahi no se puede escribir. */
+    if (!isRaw) {
+        const tAp = mkB('<i class="fa-solid fa-check"></i>', 'Aplicar', 'hover:text-violet2 hover:border-violetDim');
+        tAp.addEventListener('click', () => {
+            if (!applyTranslation(key, tC, { ce, cc })) return;
+            tC = null; tB.classList.add('hidden');
+        });
+        tH.append(tAp);
+    }
 
     const cB = mkB('<i class="fa-regular fa-copy"></i>', 'Copiar');
     cB.addEventListener('click', () => copyClip(isRaw ? text : (state.proc.data[key] ?? ce.innerText)));
@@ -547,9 +598,16 @@ export function updFab() {
 /* ─── Expand modal ─── */
 function wci(t) { const w = t.trim() ? t.trim().split(/\s+/).length : 0; return t.length + ' chars · ' + w + ' palabras'; }
 
+/* Destino de la escritura del modal expandido: null mientras muestra un campo de
+   solo lectura (vista original), donde no hay nada que aplicar. */
+let expTarget = null;
+
 export function openExp(key, label, cls, isRaw, ce, cc) {
     $('expandModalTranslation').classList.add('hidden');
     state.tr.mc = null;
+    expTarget = isRaw ? null : { key, ce, cc };
+    // En la vista original el texto es de solo lectura: no hay campo donde volcar.
+    $('expandModalApplyBtn')?.classList.toggle('hidden', isRaw);
     $('expandModalTitle').textContent = label;
     $('expandModalIcon').className = cls;
     const cur = ce.innerText;
@@ -565,10 +623,11 @@ export function openExp(key, label, cls, isRaw, ce, cc) {
         $('expandModalHint').innerHTML = '<i class="fa-solid fa-circle-info mr-1"></i> Cambios instantaneos.';
         $('expandModalContent').oninput = () => {
             const v = $('expandModalContent').innerText;
-            ce.textContent = v; state.proc.data[key] = v; state.proc.edited.add(key);
-            cc.textContent = v.length + ' chars'; $('expandModalCount').textContent = wci(v);
+            // Misma contabilidad que escribir en la tarjeta (peso e insignias
+            // incluidos): antes este camino dejaba el contador a medias.
+            writeFieldText(key, v, { ce, cc });
+            $('expandModalCount').textContent = wci(v);
             state.tr.mc = null; $('expandModalTranslation').classList.add('hidden');
-            state.vault.dirty = true;
         };
     }
     $('expandModal').classList.remove('hidden'); $('expandModal').classList.add('flex');
@@ -579,7 +638,20 @@ export function closeExp() {
     $('expandModal').classList.add('hidden'); $('expandModal').classList.remove('flex');
     $('expandModalContent').contentEditable = 'false'; $('expandModalContent').oninput = null;
     $('expandModalTranslation').classList.add('hidden'); state.tr.mc = null;
+    expTarget = null;
     if (state.tr.ma) { state.tr.ma.abort(); state.tr.ma = null; }
+}
+
+/* Vuelca la traduccion del modal sobre el campo. Se cierra antes de avisar: el
+   toast vive en z-50 y el modal en z-[60], asi que con el modal abierto el
+   aviso (y su "Deshacer") quedaria detras del fondo y no se podria pulsar. */
+export function applyExpandedTranslation() {
+    if (!expTarget) return false;
+    const text = state.tr.mc;
+    if (!text) { showToast('Nada que aplicar', 'info'); return false; }
+    const target = expTarget;
+    closeExp();
+    return applyTranslation(target.key, text, { ce: target.ce, cc: target.cc });
 }
 
 /* ─── Add field modal ─── */

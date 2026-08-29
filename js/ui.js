@@ -341,6 +341,13 @@ export function initExpandModal() {
         } catch (err) { if (err.name === 'AbortError') return; tb.classList.add('hidden'); showToast('Error', 'error'); }
         finally { $('expandModalTranslateBtn').disabled = false; }
     });
+    /* Vuelca la traduccion sobre el campo. Cerrar el modal lo hace el propio
+       applyExpandedTranslation: si no, el aviso con el "Deshacer" quedaria
+       detras del fondo, que va un z-index por encima del toast. */
+    $('expandModalApplyBtn').addEventListener('click', async () => {
+        const { applyExpandedTranslation } = await import('./editor.js');
+        applyExpandedTranslation();
+    });
 }
 
 /* ─── Add field modal listeners ─── */
