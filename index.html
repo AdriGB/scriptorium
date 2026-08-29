@@ -92,6 +92,13 @@
         #fieldIndex .fi-track{position:relative;width:7px;height:100%;border-radius:4px;background:rgba(10,11,20,.55);box-shadow:inset 0 0 0 1px rgba(54,58,106,.5)}
         #fieldIndex .fi-viewport{position:absolute;left:0;right:0;border-radius:4px;background:rgba(201,168,76,.14);box-shadow:inset 0 0 0 1px rgba(201,168,76,.3);pointer-events:none}
         #fieldIndex .fi-tick{position:absolute;left:0;width:7px;border:none;padding:0;border-radius:2px;background:#4a4f7a;cursor:pointer;transition:background-color .15s,transform .15s}
+        /* Area de clic mas grande que la marca: el aspecto sigue siendo proporcional
+           al tamano del campo, pero uno corto no obliga a acertar en 6px. El solape
+           con la vecina lo resuelve el orden de pintado (gana la siguiente), asi que
+           cada marca conserva unos 10px utiles. Cuidado al redactar: Tailwind rastrea
+           este fichero buscando nombres de utilidad, asi que cualquier palabra que
+           coincida con una de sus clases anade CSS muerto a app.css. */
+        #fieldIndex .fi-tick::before{content:'';position:absolute;left:-6px;right:-6px;top:-3px;bottom:-3px}
         #fieldIndex .fi-tick:hover{background:#a89b6a;transform:scaleX(1.6)}
         #fieldIndex .fi-tick.is-active{background:#c9a84c;transform:scaleX(1.6)}
         #fieldIndex .fi-tick:focus-visible{outline:2px solid #e8cc80;outline-offset:2px}

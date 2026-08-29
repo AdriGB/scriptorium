@@ -3,7 +3,7 @@
 import { $, activeFieldView } from './utils.js';
 
 const TICK_GAP = 2;    // px minimos entre marcas
-const TICK_MIN = 3;    // px minimos de una marca, para que siga siendo pulsable
+export const TICK_MIN = 6; // px minimos de una marca: por debajo de ~6px no se acierta
 const REVEAL_ZONE = 90; // px del borde derecho que revelan el rail
 
 /**
@@ -22,14 +22,25 @@ export function computeTicks(items, total, trackHeight, minHeight = TICK_MIN) {
     const usable = Math.max(1, trackHeight - gap * (n - 1));
     const scale = usable / total;
 
-    let heights = items.map(it => Math.max(minHeight, (it.height || 0) * scale));
-    // Si aun asi no cabe (muchos campos cortos), se comprimen todas a la vez: se
-    // pierde el minimo, pero se conserva la proporcion entre campos, que es lo que
-    // el rail comunica. Solapar seria peor: una marca taparia a la otra.
-    const span = heights.reduce((a, b) => a + b, 0);
-    if (span > usable) {
-        const k = usable / span;
-        heights = heights.map(h => h * k);
+    /* Los campos cortos suben hasta el minimo y SOLO los largos absorben la
+       diferencia. Comprimir todo proporcionalmente —lo que hacia antes— era
+       precisamente lo que dejaba los cortos en 3px: se les quitaba sitio a los que
+       ya no tenian. Un minimapa con marcas de 3px es inutil en cartas donde la
+       descripcion mide 100 veces mas que el nombre. */
+    const natural = items.map(it => Math.max(0, (it.height || 0) * scale));
+    const shortCount = natural.reduce((a, h) => a + (h < minHeight ? 1 : 0), 0);
+    const bigSum = natural.reduce((a, h) => a + (h >= minHeight ? h : 0), 0);
+    const roomForBig = usable - shortCount * minHeight;
+    let heights;
+    if (roomForBig <= 0) {
+        // Ni siquiera el minimo cabe (muchisimos campos): se reparten el alto a
+        // partes iguales. Se pierde el minimo, pero al menos no se solapan.
+        heights = natural.map(() => Math.max(1, usable / n));
+    } else if (bigSum > roomForBig) {
+        const k = roomForBig / bigSum;
+        heights = natural.map(h => (h >= minHeight ? h * k : minHeight));
+    } else {
+        heights = natural.map(h => Math.max(minHeight, h));
     }
 
     const tops = items.map(it => Math.max(0, (it.top || 0) * scale));

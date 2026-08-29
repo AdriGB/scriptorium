@@ -233,7 +233,7 @@ assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
    Funcion pura que reparte las marcas por el rail. Es donde se cuelan los dos
    fallos tipicos: marcas de altura cero en los campos cortos, y solapes cuando
    la altura minima y los huecos se acumulan. */
-const { computeTicks } = await import(new URL('../js/field-index.js', import.meta.url));
+const { computeTicks, TICK_MIN } = await import(new URL('../js/field-index.js', import.meta.url));
 
 const RAIL = 200;
 const tickSets = [
@@ -272,6 +272,24 @@ for (const [name, items, total] of tickSets) {
 // salte al sitio correcto incluso despues de reordenar por posicion.
 assert.deepEqual(computeTicks(tickSets[0][1], 1000, RAIL).map(t => t.label),
     ['Nombre', 'Descripcion', 'Saludo']);
+
+/* Carta real: dos campos enormes (descripcion, personalidad) junto a tres de una
+   linea. Es el caso que dejaba el rail inservible: al comprimir todo
+   proporcionalmente, los cortos bajaban a 3px y no habia forma de acertarlos. */
+const mixed = computeTicks([
+    { key: 'a', label: 'Nombre', top: 0, height: 20 },
+    { key: 'b', label: 'Descripcion', top: 20, height: 4000 },
+    { key: 'c', label: 'Saludo', top: 4020, height: 25 },
+    { key: 'd', label: 'Personalidad', top: 4045, height: 3000 },
+    { key: 'e', label: 'Escenario', top: 7045, height: 40 },
+], 7085, 400);
+// El minimo se comprueba contra un suelo absoluto, no solo contra la constante: si
+// alguien la baja a 3px el test tiene que quejarse, no acompanarla.
+assert.ok(TICK_MIN >= 6, 'Por debajo de 6px una marca no hay quien la acierte');
+[0, 2, 4].forEach(i => assert.ok(mixed[i].height >= TICK_MIN,
+    'El campo corto ' + i + ' se quedo en ' + mixed[i].height + 'px'));
+// Pero los largos siguen dominando: es lo que hace que el rail informe.
+assert.ok(mixed[1].height > mixed[0].height * 10, 'El campo largo apenas destaca');
 
 assert.deepEqual(computeTicks([], 1000, RAIL), [], 'Sin campos no hay marcas');
 assert.deepEqual(computeTicks(tickSets[0][1], 0, RAIL), [], 'Sin contenido no hay marcas');
