@@ -417,7 +417,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     /* ── Keyboard shortcuts ── */
     document.addEventListener('keydown', e => {
         const isInput = e.target.matches('input,textarea,[contenteditable="true"]');
-        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (processBtn && !processBtn.disabled) processBtn.click(); }
+        /* Campo de carta (o el modal expandido), no un input del lateral: ahi
+           Ctrl+Enter dispara el ritual, que repinta las tarjetas, y el repintado
+           se lleva por delante la pila nativa de Ctrl+Z (el nodo se reemplaza;
+           no hay forma de conservarla). Ademas dejaria al modal expandido
+           escribiendo sobre una tarjeta que ya no esta en el DOM. En los inputs
+           del lateral el atajo sigue valiendo, que es donde se espera: escribes
+           el nombre e invocas sin soltar el teclado. */
+        const inCard = e.target.matches('[contenteditable="true"]');
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter' && !e.shiftKey && !inCard) { e.preventDefault(); if (processBtn && !processBtn.disabled) processBtn.click(); }
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') { e.preventDefault(); const jv = $('jsonView'); const jab = $('jsonApplyBtn'); if (jv && !jv.classList.contains('hidden') && jab && !jab.disabled) jab.click(); }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') { if (!isInput) { e.preventDefault(); togEd(); } }
         if (e.key === 'Escape') {

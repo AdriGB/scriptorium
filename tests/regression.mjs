@@ -454,6 +454,18 @@ assert.doesNotMatch(actionSection[0], /(?:^|\s)sticky/, 'En movil una barra fija
 // Tailwind escanea el HTML: si la clase no se genera, la barra no se pega aunque este puesta.
 assert.match(cssSource, /\.md\\:sticky/, 'md:sticky no llego al CSS generado');
 
+/* Ctrl+Enter dentro de un campo de la carta disparaba el ritual: el repintado
+   reemplaza el nodo y se lleva por delante la pila nativa de Ctrl+Z (no hay
+   forma de conservarla, el elemento es otro). El atajo tiene que callarse ahi,
+   pero no en los inputs del lateral, que es donde se espera: escribes el nombre
+   e invocas sin soltar el teclado. */
+const appLines = appSourceFull.split('\n');
+const ctrlEnterLine = appLines.find(l => l.includes("e.key === 'Enter'") && l.includes('!e.shiftKey'));
+assert.ok(ctrlEnterLine, 'Falta el atajo Ctrl+Enter');
+assert.match(ctrlEnterLine, /!inCard/, 'Ctrl+Enter vuelve a repintar mientras se escribe en un campo');
+assert.ok(appLines.some(l => l.includes("const inCard = e.target.matches('[contenteditable=\"true\"]')")),
+    'inCard debe mirar solo el atributo contenteditable: en un input no vale');
+
 const undefinedIdents = [];
 for (const file of jsFiles) {
     const src = await readFile(new URL(file, jsDir), 'utf8');
