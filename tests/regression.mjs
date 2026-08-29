@@ -468,6 +468,30 @@ for (const fn of ['applyP', 'updLbl']) {
     assert.match(body[0], /updSummary\(/, `${fn} no refresca la cabecera del perfil activo`);
 }
 
+/* En movil el panel lateral es una pagina entera y la carta queda debajo. Con
+   carta cargada se recoge solo; al limpiar vuelve a abrirse, porque dentro vive
+   el area de arrastre. Dos detalles faciles de perder: el estado automatico NO
+   se persiste (si no, una sesion en movil dejaria el panel plegado tambien en
+   escritorio, donde no estorba) y el usuario manda si ya pulso el boton. */
+assert.ok(/function autoSidebarCollapse\(/.test(uiSource), 'Falta el recogido automatico del panel');
+assert.ok(/function autoSidebarExpand\(/.test(uiSource), 'Falta la apertura automatica del panel');
+assert.ok(/panelSetByUser/.test(uiSource), 'El usuario debe poder decidir por encima del automatico');
+assert.match(uiSource, /max-width: 767\.98px/, 'El automatico debe limitarse al ancho de movil');
+// Cada uno por su cuenta: mirar el fichero entero no sirve, porque el otro
+// camino (la apertura) seguira cumpliendo el patron aunque este falle.
+const collapseBody = uiSource.match(/function autoSidebarCollapse\([\s\S]*?\n\}/);
+const expandBody = uiSource.match(/function autoSidebarExpand\([\s\S]*?\n\}/);
+assert.ok(collapseBody, 'No se encuentra el cuerpo de autoSidebarCollapse');
+assert.ok(expandBody, 'No se encuentra el cuerpo de autoSidebarExpand');
+assert.match(collapseBody[0], /setPanelCollapsed\(true, false\)/, 'El recogido automatico no debe persistirse');
+assert.match(expandBody[0], /setPanelCollapsed\(false, false\)/, 'La apertura automatica no debe persistirse');
+// Sin la guarda de ancho, el panel se recogeria tambien en escritorio, donde es
+// una columna y no estorba a nada.
+assert.match(collapseBody[0], /isNarrow\(\)/, 'El recogido automatico debe limitarse a movil');
+assert.match(expandBody[0], /isNarrow\(\)/, 'La apertura automatica debe limitarse a movil');
+assert.match(appSourceFull, /autoSidebarCollapse\(\)/, 'Cargar una carta no recoge el panel en movil');
+assert.match(appSourceFull, /autoSidebarExpand\(\)/, 'Limpiar no vuelve a abrir el panel en movil');
+
 /* Ctrl+Enter dentro de un campo de la carta disparaba el ritual: el repintado
    reemplaza el nodo y se lleva por delante la pila nativa de Ctrl+Z (no hay
    forma de conservarla, el elemento es otro). El atajo tiene que callarse ahi,

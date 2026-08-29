@@ -7,7 +7,7 @@ import { openVault, saveCurrentToVault } from './vault.js';
 import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel, exportCurrentProfile, importProfileFile, exportAllProfiles, importProfilesBundle } from './profiles.js';
 import { processText, renderRaw, renderProc, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount, updateWeight, emptyFieldsState } from './editor.js';
 import { openExpModal, closeExpModal, copyAll } from './export.js';
-import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor, initConfirmModal, initFocusTraps, initShortcutsModal, initWelcome, closeShortcuts } from './ui.js';
+import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor, initConfirmModal, initFocusTraps, initShortcutsModal, initWelcome, closeShortcuts, autoSidebarCollapse, autoSidebarExpand } from './ui.js';
 import { initFieldIndex } from './field-index.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -139,6 +139,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         else { renderProc(); if (state.characterBook.present) $('tabLorebook')?.click(); }
         renderJSONSafely();
         if (saved.editorActive && !state.editor.active) togEd();
+        autoSidebarCollapse();
     }
 
     if (!fileInput || !dropzone) { console.error('DOM critico no encontrado'); return; }
@@ -311,6 +312,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
         else $('tabRaw')?.click();
         renderJSONSafely(true);
+        // Ya hay carta que mirar: en movil el panel se recoge para dejarla ver.
+        autoSidebarCollapse();
         if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
     }
 
@@ -372,6 +375,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         updLorebookCount();
         setWorkspaceLoaded(false);
         setActiveTab('tabProcessed');
+        // Sin carta, en movil el panel vuelve a abrirse: es donde se carga la siguiente.
+        autoSidebarExpand();
         showToast('Tomo purificado', 'success', {
             label: 'Deshacer',
             onClick: async () => {

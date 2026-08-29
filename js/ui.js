@@ -41,9 +41,14 @@ export function initCanvas() {
 }
 
 /* ─── Sidebar ─── */
+let panelEl = null;
+let setPanelCollapsed = null;   // la rellena initSidebar()
+let panelSetByUser = false;     // si el usuario ya decidio, manda el
+
 export function initSidebar() {
     const leftPanel = $('leftPanel'), btn = $('sidebarToggleBtn');
     const groups = [...leftPanel.querySelectorAll('.sidebar-group')];
+    panelEl = leftPanel;
 
     /* Los grupos ya NO son excluyentes: antes abrir uno cerraba los demas, lo que
        obligaba a reabrirlos cada vez. En su lugar se recuerda el estado de cada uno. */
@@ -57,16 +62,41 @@ export function initSidebar() {
             Storage.set(STORAGE_KEYS.SIDEBAR_GROUPS, map);
         });
     });
-    function setCollapsed(c) {
+    /* `persist=false` es para los recogidos automaticos (ver autoSidebarCollapse):
+       si se guardaran, una sesion en movil dejaria el panel plegado tambien en
+       el escritorio, donde no estorba a nada. */
+    function setCollapsed(c, persist = true) {
         leftPanel.classList.toggle('panel-collapsed', c);
         btn.classList.toggle('is-collapsed', c);
         btn.setAttribute('aria-expanded', String(!c));
         btn.title = c ? 'Mostrar' : 'Ocultar';
         btn.setAttribute('aria-label', btn.title);
-        Storage.setBool(STORAGE_KEYS.SIDEBAR, c);
+        if (persist) Storage.setBool(STORAGE_KEYS.SIDEBAR, c);
     }
-    btn.addEventListener('click', () => setCollapsed(!leftPanel.classList.contains('panel-collapsed')));
+    setPanelCollapsed = setCollapsed;
+    btn.addEventListener('click', () => {
+        panelSetByUser = true;
+        setCollapsed(!leftPanel.classList.contains('panel-collapsed'));
+    });
     if (Storage.getBool(STORAGE_KEYS.SIDEBAR)) setCollapsed(true);
+}
+
+/* En movil el panel es una pagina entera y la carta queda debajo: con carta
+   cargada lo que importa es el resultado, asi que se recoge solo; al limpiar se
+   vuelve a abrir, porque ahi dentro vive el area de arrastre. En escritorio el
+   panel es una columna y la carta se ve igual, asi que no se toca. */
+const isNarrow = () => window.matchMedia('(max-width: 767.98px)').matches;
+
+export function autoSidebarCollapse() {
+    if (panelSetByUser || !panelEl || !setPanelCollapsed || !isNarrow()) return;
+    if (panelEl.classList.contains('panel-collapsed')) return;
+    setPanelCollapsed(true, false);
+}
+
+export function autoSidebarExpand() {
+    if (panelSetByUser || !panelEl || !setPanelCollapsed || !isNarrow()) return;
+    if (!panelEl.classList.contains('panel-collapsed')) return;
+    setPanelCollapsed(false, false);
 }
 
 /* ─── Tabs ─── */
