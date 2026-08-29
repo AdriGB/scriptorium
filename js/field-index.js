@@ -4,6 +4,7 @@ import { $, activeFieldView } from './utils.js';
 
 const TICK_GAP = 2;    // px minimos entre marcas
 export const TICK_MIN = 6; // px minimos de una marca: por debajo de ~6px no se acierta
+export const LABEL_H = 16; // alto de la etiqueta con el titulo: una linea
 const REVEAL_ZONE = 90; // px del borde derecho que revelan el rail
 
 /**
@@ -12,8 +13,12 @@ const REVEAL_ZONE = 90; // px del borde derecho que revelan el rail
  * Es pura (no toca el DOM) para poder probarla en Node: concentra toda la
  * aritmetica y es donde se cuelan los dos fallos tipicos —marcas de altura cero
  * en los campos cortos, y solapes cuando el minimo se come el hueco—.
+ *
+ * Devuelve tambien `labelTop`, la posicion del titulo de cada campo, y el flag
+ * `labelsFit`: si los titulos no caben todos, el DOM solo pinta el del campo
+ * activo en vez de apilar renglones ilegibles.
  */
-export function computeTicks(items, total, trackHeight, minHeight = TICK_MIN) {
+export function computeTicks(items, total, trackHeight, minHeight = TICK_MIN, labelHeight = LABEL_H) {
     if (!(total > 0) || !(trackHeight > 0) || !items.length) return [];
     const n = items.length;
     // El hueco se descuenta ANTES de escalar. Si no, las alturas minimas y los
@@ -48,57 +53,69 @@ export function computeTicks(items, total, trackHeight, minHeight = TICK_MIN) {
         const floor = tops[i - 1] + heights[i - 1] + gap;
         if (tops[i] < floor) tops[i] = floor;
     }
-    // Red de seguridad: si el primer campo no empieza en 0 y el ultimo se sale,
-    // se desplaza el bloque entero sin romper el orden ni los huecos.
-    const overflow = tops[n - 1] + heights[n - 1] - trackHeight;
-    if (overflow > 0) {
-        const shift = Math.min(tops[0], overflow);
-        for (let i = 0; i < n; i++) tops[i] -= shift;
+    /* Segunda pasada, ahora de atras hacia delante. Sin ella, un campo enorme
+       seguido de muchos cortos saca las marcas por debajo del rail: la posicion
+       natural de los cortos esta aqui abajo y la primera pasada solo empuja,
+       nunca recoge. Es la forma habitual de una carta real (descripcion larga y
+       media docena de campos de una linea detras). */
+    tops[n - 1] = Math.min(tops[n - 1], trackHeight - heights[n - 1]);
+    for (let i = n - 2; i >= 0; i--) {
+        tops[i] = Math.min(tops[i], tops[i + 1] - heights[i] - gap);
     }
-    return items.map((it, i) => ({ key: it.key, label: it.label, top: tops[i], height: heights[i] }));
+    /* Si el bloque entero se ha ido arriba, se desplaza sin romper el orden ni los
+       huecos... pero solo hasta donde aguante la ultima marca: si el hueco sobra
+       abajo y no arriba, mas vale que la primera asome un pelin que sacar la
+       ultima del rail (no hay clipping, se veria colgando fuera). */
+    if (tops[0] < -1e-9) {
+        const shift = Math.min(-tops[0], Math.max(0, trackHeight - heights[n - 1] - tops[n - 1]));
+        for (let i = 0; i < n; i++) tops[i] += shift;
+    }
+    // Lo ultimo es solo ruido de coma flotante: restar deja -1e-15 en vez de 0.
+    // Un negativo de verdad se deja estar, porque recortarlo solaparia la
+    // siguiente marca, que es peor que asomar un pelin por arriba.
+    if (tops[0] < 0 && tops[0] > -1e-6) tops[0] = 0;
+
+    /* Titulos: centrados en su marca, pero con separacion minima —se ven todos a
+       la vez, asi que dos no pueden pisarse—. Mismo esquema de dos pasadas que
+       las marcas: empujar hacia abajo y luego recoger hacia arriba.
+       Si no caben todos, no se aprietan: `labelsFit` avisa al DOM para que solo
+       pinte el del campo activo, que es lo unico legible con tantos campos. */
+    const labelsFit = n * labelHeight <= trackHeight;
+    // El suelo de 0 va aqui, antes de las pasadas: si un titulo arranca en
+    // negativo y se recorta al final, su vecino ya no esta a la distancia minima
+    // y los dos primeros se solapan (encontrado con fuzz: 1 de cada 6 cartas).
+    const labelTops = tops.map((t, i) => Math.max(0, t + heights[i] / 2 - labelHeight / 2));
+    if (labelsFit) {
+        for (let i = 1; i < n; i++) labelTops[i] = Math.max(labelTops[i], labelTops[i - 1] + labelHeight);
+        for (let i = n - 1; i >= 0; i--) {
+            const cap = trackHeight - labelHeight - (n - 1 - i) * labelHeight;
+            labelTops[i] = Math.min(labelTops[i], cap);
+            if (i > 0) labelTops[i - 1] = Math.min(labelTops[i - 1], labelTops[i] - labelHeight);
+        }
+    }
+    for (let i = 0; i < n; i++) {
+        labelTops[i] = Math.min(Math.max(0, labelTops[i]), Math.max(0, trackHeight - labelHeight));
+    }
+
+    const ticks = items.map((it, i) => ({
+        key: it.key,
+        label: it.label,
+        top: tops[i],
+        height: heights[i],
+        labelTop: labelTops[i],
+    }));
+    ticks.labelsFit = labelsFit;
+    return ticks;
 }
 
-let rail = null, track = null, viewport = null, tip = null, scroller = null, wrapper = null;
+let rail = null, track = null, viewport = null, scroller = null, wrapper = null;
 let entries = [];
 let reduced = false;
 let rafScroll = 0, rafBuild = 0;
-let hideTimer = 0;
-
-/* La etiqueta se cierra con un pequeno retardo para que el cursor pueda pasar
-   de la marca a la propia etiqueta sin que se esfume: son dos elementos
-   separados y, sin el retardo, el mouseleave de la marca gana la carrera. */
-function scheduleHide() {
-    if (hideTimer) clearTimeout(hideTimer);
-    hideTimer = setTimeout(() => { tip.classList.remove('is-visible'); hideTimer = 0; }, 160);
-}
-
-function showTip(btn) {
-    const e = entries[Number(btn.dataset.index)];
-    if (!e || !tip) return;
-    if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; }
-    // Etiqueta a dos lineas: nombre del campo y un trozito de su contenido.
-    // Asi, aunque la marca sea pequena, el blanco de clic efectivo pasa a ser
-    // todo el cuadro de la etiqueta, que es mucho mas facil de acertar.
-    tip.replaceChildren();
-    const label = document.createElement('div');
-    label.className = 'fi-tip-label';
-    label.textContent = e.label;
-    tip.appendChild(label);
-    if (e.snippet) {
-        const sn = document.createElement('div');
-        sn.className = 'fi-tip-snippet';
-        sn.textContent = e.snippet;
-        tip.appendChild(sn);
-    }
-    tip.dataset.index = btn.dataset.index;
-    tip.style.top = Math.max(0, btn.offsetTop + btn.offsetHeight / 2 - tip.offsetHeight / 2) + 'px';
-    tip.classList.add('is-visible');
-}
 
 function setVisible(v) {
     if (!rail || rail.hidden) return;
     rail.classList.toggle('is-visible', v);
-    if (!v) scheduleHide();
 }
 
 function jumpTo(i) {
@@ -112,11 +129,14 @@ function createTick() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'fi-tick';
+    // El titulo va dentro del boton y se ve con el rail, sin pasar el raton por
+    // encima. Va en coordenadas del rail (`labelTop` relativo a la marca) para que
+    // dos titulos de campos cortos no se pisen. No captura el puntero —lo hace el
+    // CSS— para no tapar el contenido sobre el que flota.
+    const lab = document.createElement('span');
+    lab.className = 'fi-label';
+    b.appendChild(lab);
     b.addEventListener('click', () => jumpTo(Number(b.dataset.index)));
-    b.addEventListener('mouseenter', () => showTip(b));
-    b.addEventListener('mouseleave', scheduleHide);
-    b.addEventListener('focus', () => showTip(b));
-    b.addEventListener('blur', scheduleHide);
     track.appendChild(b);
     return b;
 }
@@ -129,24 +149,10 @@ function fieldLabel(card) {
     return String(card.dataset.key || '').replace(/_/g, ' ');
 }
 
-/* Primeras palabras del contenido del campo. Sirve para identificar de un vistazo
-   que campo es, y ademas convierte la etiqueta en un blanco de clic amplio: aunque
-   la marca mida 6px, el cuadro de la etiqueta puede ser de 200+ px y es clicable. */
-function fieldSnippet(card) {
-    const ce = card.querySelector('.field-card-body [contenteditable]')
-        || card.querySelector('.field-card-body > div:not(.hidden)');
-    const text = (ce?.textContent || card.querySelector('.field-card-body')?.textContent || '');
-    const t = String(text).replace(/\s+/g, ' ').trim();
-    if (!t) return '';
-    return t.length > 64 ? t.slice(0, 64).trimEnd() + '…' : t;
-}
-
 function hideRail() {
     rail.hidden = true;
     rail.classList.remove('is-visible');
     entries = [];
-    if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; }
-    if (tip) tip.classList.remove('is-visible');
 }
 
 function rebuild() {
@@ -167,7 +173,6 @@ function rebuild() {
             height: r.height,
             key: card.dataset.key || '',
             label: fieldLabel(card),
-            snippet: fieldSnippet(card),
         };
     }).sort((a, b) => a.top - b.top);
 
@@ -179,6 +184,10 @@ function rebuild() {
     while (nodes.length > ticks.length) nodes.pop().remove();
     while (nodes.length < ticks.length) nodes.push(createTick());
 
+    // Con mas titulos que alto, solo se pinta el del campo activo: ver cuarenta
+    // renglones medio solapados no ayuda a encontrar ninguno.
+    rail.classList.toggle('labels-compact', ticks.labelsFit === false);
+
     nodes.forEach((b, i) => {
         const t = ticks[i];
         b.style.top = t.top + 'px';
@@ -186,6 +195,12 @@ function rebuild() {
         b.dataset.index = String(i);
         b.title = t.label;
         b.setAttribute('aria-label', 'Ir a ' + t.label);
+        // La etiqueta se coloca en coordenadas del rail dentro del boton, porque
+        // es donde esta calculado el reparto sin solapes.
+        const lab = b.firstElementChild;
+        if (!lab) return;
+        lab.textContent = t.label;
+        lab.style.top = (t.labelTop - t.top) + 'px';
     });
 }
 
@@ -227,16 +242,8 @@ export function initFieldIndex() {
     track.className = 'fi-track';
     viewport = document.createElement('div');
     viewport.className = 'fi-viewport';
-    tip = document.createElement('div');
-    tip.className = 'fi-tip';
     track.appendChild(viewport);
-    rail.append(track, tip);
-
-    // La propia etiqueta es clicable: si el cursor pasa de la marca a la
-    // etiqueta, scheduleHide da tiempo a que se cancele al reentrar.
-    tip.addEventListener('click', () => jumpTo(Number(tip.dataset.index)));
-    tip.addEventListener('mouseenter', () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; } });
-    tip.addEventListener('mouseleave', scheduleHide);
+    rail.appendChild(track);
 
     scroller.addEventListener('mousemove', e => {
         const r = scroller.getBoundingClientRect();

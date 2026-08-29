@@ -91,7 +91,10 @@
         #fieldIndex.is-visible{opacity:1;pointer-events:auto}
         #fieldIndex .fi-track{position:relative;width:7px;height:100%;border-radius:4px;background:rgba(10,11,20,.55);box-shadow:inset 0 0 0 1px rgba(54,58,106,.5)}
         #fieldIndex .fi-viewport{position:absolute;left:0;right:0;border-radius:4px;background:rgba(201,168,76,.14);box-shadow:inset 0 0 0 1px rgba(201,168,76,.3);pointer-events:none}
-        #fieldIndex .fi-tick{position:absolute;left:0;width:7px;border:none;padding:0;border-radius:2px;background:#4a4f7a;cursor:pointer;transition:background-color .15s,transform .15s}
+        /* La barra visible vive en ::after, no en el boton: si se la aplicara al
+           boton, el scaleX de hover/activo estiraria tambien el titulo. */
+        #fieldIndex .fi-tick{position:absolute;left:0;width:7px;border:none;padding:0;background:none;cursor:pointer}
+        #fieldIndex .fi-tick::after{content:'';position:absolute;inset:0;border-radius:2px;background:#4a4f7a;transition:background-color .15s,transform .15s}
         /* Area de clic mas grande que la marca: el aspecto sigue siendo proporcional
            al tamano del campo, pero uno corto no obliga a acertar en 6px. El solape
            con la vecina lo resuelve el orden de pintado (gana la siguiente), asi que
@@ -99,14 +102,17 @@
            este fichero buscando nombres de utilidad, asi que cualquier palabra que
            coincida con una de sus clases anade CSS muerto a app.css. */
         #fieldIndex .fi-tick::before{content:'';position:absolute;left:-6px;right:-6px;top:-3px;bottom:-3px}
-        #fieldIndex .fi-tick:hover{background:#a89b6a;transform:scaleX(1.6)}
-        #fieldIndex .fi-tick.is-active{background:#c9a84c;transform:scaleX(1.6)}
+        #fieldIndex .fi-tick:hover::after{background:#a89b6a;transform:scaleX(1.6)}
+        #fieldIndex .fi-tick.is-active::after{background:#c9a84c;transform:scaleX(1.6)}
         #fieldIndex .fi-tick:focus-visible{outline:2px solid #e8cc80;outline-offset:2px}
-        #fieldIndex .fi-tip{position:absolute;right:36px;min-width:120px;max-width:280px;padding:.4rem .65rem;border-radius:6px;background:#12142a;border:1px solid #252848;pointer-events:none;cursor:pointer;opacity:0;transition:opacity .15s,border-color .15s,background-color .15s}
-        #fieldIndex .fi-tip.is-visible{opacity:1;pointer-events:auto}
-        #fieldIndex .fi-tip:hover{border-color:#7a6230;background:#16182e}
-        #fieldIndex .fi-tip-label{color:#e8cc80;font-family:'Cinzel',serif;font-size:.6rem;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-        #fieldIndex .fi-tip-snippet{margin-top:3px;color:#a09a85;font-family:'Crimson',serif;font-size:.72rem;font-style:italic;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+        /* Titulo del campo, visible con el rail (sin pasar el raton por la marca) y
+           colocado en coordenadas del rail por el JS. Solo el nombre: un trozo del
+           contenido anadia ruido y hacia la caja demasiado grande. pointer-events
+           none para no robarle clics al contenido sobre el que flota. */
+        #fieldIndex .fi-label{position:absolute;right:15px;height:16px;max-width:190px;padding:0 .4rem;border-radius:4px;background:rgba(14,16,32,.92);border:1px solid #252848;color:#a09a85;font-family:'Crimson',serif;font-size:.7rem;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+        #fieldIndex .fi-tick.is-active .fi-label{color:#e8cc80;border-color:#7a6230;background:rgba(22,24,46,.95)}
+        #fieldIndex.labels-compact .fi-label{opacity:0}
+        #fieldIndex.labels-compact .fi-tick.is-active .fi-label{opacity:1}
         @media(max-width:767.98px){#fieldIndex{display:none}}
     </style>
 </head>

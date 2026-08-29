@@ -233,7 +233,7 @@ assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
    Funcion pura que reparte las marcas por el rail. Es donde se cuelan los dos
    fallos tipicos: marcas de altura cero en los campos cortos, y solapes cuando
    la altura minima y los huecos se acumulan. */
-const { computeTicks, TICK_MIN } = await import(new URL('../js/field-index.js', import.meta.url));
+const { computeTicks, TICK_MIN, LABEL_H } = await import(new URL('../js/field-index.js', import.meta.url));
 
 const RAIL = 200;
 const tickSets = [
@@ -272,6 +272,66 @@ for (const [name, items, total] of tickSets) {
 // salte al sitio correcto incluso despues de reordenar por posicion.
 assert.deepEqual(computeTicks(tickSets[0][1], 1000, RAIL).map(t => t.label),
     ['Nombre', 'Descripcion', 'Saludo']);
+
+/* Los titulos se pintan todos a la vez, asi que no pueden pisarse ni salirse del
+   rail. Cuando no caben, `labelsFit` avisa al DOM para que solo pinte el del
+   campo activo en lugar de apilar cuarenta renglones ilegibles. */
+const labelled = computeTicks(tickSets[0][1], 1000, RAIL);
+assert.equal(labelled.labelsFit, true, 'Tres titulos caben en el rail');
+labelled.forEach((t, i) => {
+    assert.ok(t.labelTop >= 0 && t.labelTop + LABEL_H <= RAIL + 0.01, 'El titulo ' + i + ' se sale del rail');
+    if (i > 0) {
+        assert.ok(t.labelTop >= labelled[i - 1].labelTop + LABEL_H - 1e-9,
+            'Los titulos ' + (i - 1) + ' y ' + i + ' se solapan');
+    }
+});
+assert.equal(computeTicks(tickSets[2][1], 5000, RAIL).labelsFit, false, 'Cincuenta titulos no caben en 200px');
+
+/* Los tres juegos de arriba son casos escogidos; este barre combinaciones al azar
+   con semilla fija (para que no baile entre ejecuciones). Es lo que encontro los
+   dos unicos fallos que quedaban:
+     - el desplazamiento final sacaba la ultima marca por debajo del rail;
+     - recortar los titulos al final dejaba los dos primeros solapados.
+   No se exige que la primera marca empiece en 0: con mas marcas que alto util no
+   cabe todo y asomar por arriba es lo menos malo (solapar taparia una marca).
+   El generador es mulberry32 con semilla fija: con un LCG clasico
+   (`seed * 1103515245 + 12345`) el producto supera 2^53, el modulo se degrada y
+   de 100000 tiradas solo salen ~11000 distintas — no basta para barrer nada. */
+let seed = 20260829;
+const rnd = () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = seed;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+// 20000 por el segundo fallo: en la secuencia sembrada su primer caso esta en la
+// iteracion 4222 (58 marcas en un rail de 60px), asi que con menos no salta.
+for (let iter = 0; iter < 20000; iter++) {
+    const n = 2 + Math.floor(rnd() * 60);
+    const railH = Math.floor(60 + rnd() * 840);
+    let top = 0;
+    const items = Array.from({ length: n }, (_, i) => {
+        const h = rnd() < 0.5 ? 1 + rnd() * 40 : 40 + rnd() * 5000;
+        const it = { key: 'k' + i, label: 'L' + i, top, height: h };
+        top += h + rnd() * 30;
+        return it;
+    });
+    const ticks = computeTicks(items, top, railH);
+    const where = 'n=' + n + ' rail=' + railH;
+    ticks.forEach((tick, i) => {
+        assert.ok(tick.height > 0, where + ': marca ' + i + ' sin altura');
+        assert.ok(tick.top + tick.height <= railH + 0.01, where + ': la marca ' + i + ' se sale por abajo');
+        if (i > 0) {
+            assert.ok(tick.top >= ticks[i - 1].top + ticks[i - 1].height - 1e-9, where + ': solape en ' + i);
+        }
+        if (!ticks.labelsFit) return;
+        assert.ok(tick.labelTop >= 0 && tick.labelTop + LABEL_H <= railH + 0.01, where + ': titulo ' + i + ' fuera del rail');
+        if (i > 0) {
+            assert.ok(tick.labelTop >= ticks[i - 1].labelTop + LABEL_H - 1e-9, where + ': titulos ' + (i - 1) + ' y ' + i + ' solapados');
+        }
+    });
+}
 
 /* Carta real: dos campos enormes (descripcion, personalidad) junto a tres de una
    linea. Es el caso que dejaba el rail inservible: al comprimir todo
