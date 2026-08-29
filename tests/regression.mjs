@@ -171,9 +171,22 @@ const GLOBALS = new Set([
 
 const DECL_RE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)|(?:\bfunction\s*\*?\s*)([A-Za-z_$][\w$]*)|(?:\bclass\s+)([A-Za-z_$][\w$]*)|(?:\bcatch\s*\(\s*)([A-Za-z_$][\w$]*)/g;
 
+/* `let a = 0, b = 0;` — DECL_RE solo recoge el primer nombre de la lista, asi que
+   `b` pareceria sin declarar. Se recogen los declaradores siguientes, pero solo
+   si su inicializador no lleva comas propias (arrays, objetos, llamadas): ahi la
+   coma es ambigua y preferimos no arriesgar. Del ultimo declarador solo importa
+   el nombre, asi que su inicializador puede ser cualquier cosa hasta el `;`. */
+const MULTI_DECL_RE = /\b(?:const|let|var)\s+((?:[A-Za-z_$][\w$]*\s*(?:=\s*[^,;{}()[\]]*)?\s*,\s*)+[A-Za-z_$][\w$]*\s*(?:=[^;]*)?)/g;
+
 function declaredNames(src) {
     const names = new Set();
     for (const m of src.matchAll(DECL_RE)) names.add(m[1] || m[2] || m[3] || m[4]);
+    for (const m of src.matchAll(MULTI_DECL_RE)) {
+        for (const part of m[1].split(',')) {
+            const id = part.split('=')[0].trim();
+            if (/^[A-Za-z_$][\w$]*$/.test(id)) names.add(id);
+        }
+    }
     /* Destructuring en declaraciones y parametros. Ojo: un `{...}` generico no sirve,
        porque el propio `${x}` del template literal casa con el y daria por declarado
        cualquier identificador. Solo se acepta en posicion de declaracion. */
@@ -371,6 +384,14 @@ const deadIds = [...new Set([...indexSource.matchAll(/\sid="([^"]+)"/g)].map(m =
     // Referencias internas del HTML: for=, aria-labelledby=, href=#...
     .filter(id => !htmlWithoutIds.includes(id));
 assert.deepEqual(deadIds, [], 'Ids del HTML sin referenciar en JS, CSS ni en el propio HTML');
+
+/* "Invocar y sustituir" reescribe todos los campos de golpe y ademas se dispara
+   solo al cargar una carta, asi que el aviso tiene que ofrecer deshacer. Son dos
+   piezas: la accion en el toast y la funcion que devuelve el texto anterior. Si
+   alguien quita una, sale por aqui. Es el mismo patron que ya usa "Limpiar todo". */
+const editorSrc = await readFile(new URL('../js/editor.js', import.meta.url), 'utf8');
+assert.ok(/label:\s*'Deshacer'/.test(editorSrc), 'El aviso de la sustitucion no ofrece deshacer');
+assert.ok(/function restoreProcessed/.test(editorSrc), 'Falta la funcion que deshace la sustitucion');
 
 const undefinedIdents = [];
 for (const file of jsFiles) {

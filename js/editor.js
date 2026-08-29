@@ -373,14 +373,25 @@ export function renameField(oldKey, newName) {
 /* ─── Process text ─── */
 export function processText() {
     if (!Object.keys(getExtracted()).length && !$('sysPrompt').value.trim() && !state.characterBook.present) return;
-    const cn = charNameInput().value.trim() || '{{char}}', un = userNameInput().value.trim() || '{{user}}',
+    const cnRaw = charNameInput().value.trim(), unRaw = userNameInput().value.trim();
+    const cn = cnRaw || '{{char}}', un = unRaw || '{{user}}',
         persona = $('userPersona').value.trim(), sp = $('sysPrompt').value.trim(),
         cR = /\{\{char\}\}/gi, uR = /\{\{user\}\}/gi;
     const prev = { ...state.proc.data };
+    const prevEdited = new Set(state.proc.edited);
+    let hits = 0, touched = 0;
+    /* Sustituye y cuenta. Sin nombre propio no se cuenta nada: cambiar {{char}}
+       por {{char}} no es una sustitucion y solo anadiria ruido al aviso. */
+    const sub = (value) => {
+        const s = String(value ?? '');
+        const n = (cnRaw ? (s.match(cR) || []).length : 0) + (unRaw ? (s.match(uR) || []).length : 0);
+        if (n > 0) { hits += n; touched++; }
+        return s.replace(cR, () => cn).replace(uR, () => un);
+    };
     state.proc.data = {};
     if (sp) {
         const k = VF.SP;
-        state.proc.data[k] = state.proc.edited.has(k) && prev[k] ? prev[k] : sp.replace(cR, () => cn).replace(uR, () => un);
+        state.proc.data[k] = state.proc.edited.has(k) && prev[k] ? prev[k] : sub(sp);
     }
     const allGreetings = [state.altGreetings.original, ...state.altGreetings.list];
     for (const [k, v] of Object.entries(getExtracted())) {
@@ -389,18 +400,38 @@ export function processText() {
             const idx = state.altGreetings.current;
             if (idx > 0 && idx < allGreetings.length) rawValue = allGreetings[idx];
         }
-        state.proc.data[k] = state.proc.edited.has(k) && prev[k] !== undefined ? prev[k] : rawValue.replace(cR, () => cn).replace(uR, () => un);
+        state.proc.data[k] = state.proc.edited.has(k) && prev[k] !== undefined ? prev[k] : sub(rawValue);
     }
     if (persona) {
         const k = VF.UP;
-        state.proc.data[k] = state.proc.edited.has(k) && prev[k] ? prev[k] : persona.replace(cR, () => cn).replace(uR, () => un);
+        state.proc.data[k] = state.proc.edited.has(k) && prev[k] ? prev[k] : sub(persona);
     }
     for (const ek of state.editor.added) if (prev[ek] !== undefined && state.proc.data[ek] === undefined) state.proc.data[ek] = prev[ek];
     setProcessedCount(Object.keys(state.proc.data).length);
     state.vault.dirty = true;
     renderProc();
     $('tabProcessed').click();
-    showToast('Ritual completado');
+    /* Deshacer, igual que en "Limpiar todo": el aviso lleva la accion. Aqui
+       basta con guardar el texto procesado anterior, porque este ritual no toca
+       ni el fichero ni el lorebook. Si no habia nada antes no se ofrece:
+       deshacer hacia un panel vacio se confunde con un fallo, no con un retorno. */
+    const canUndo = Object.keys(prev).length > 0;
+    const msg = hits
+        ? `${hits} sustitucion${hits === 1 ? '' : 'es'} en ${touched} campo${touched === 1 ? '' : 's'}`
+        : 'Ritual completado';
+    showToast(msg, hits ? 'success' : 'info',
+        canUndo ? { label: 'Deshacer', onClick: () => restoreProcessed(prev, prevEdited) } : null);
+}
+
+/* Vuelta atras de "Invocar y sustituir". Recupera tambien el conjunto de campos
+   editados a mano: es lo que el siguiente ritual respeta para no pisarlos. */
+function restoreProcessed(data, edited) {
+    state.proc.data = { ...data };
+    state.proc.edited = new Set(edited);
+    state.vault.dirty = true;
+    setProcessedCount(Object.keys(state.proc.data).length);
+    renderProc();
+    showToast('Sustitucion deshecha', 'info');
 }
 
 /* ─── Toggle editor ─── */
