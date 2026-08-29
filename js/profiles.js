@@ -35,7 +35,19 @@ export function loadProfiles() {
 
 function savePrf() { Storage.set(STORAGE_KEYS.PROFILES, { activeProfileId: state.profiles.active, profiles: state.profiles.lib }); }
 
+/* El grupo "Aventurero" esta cerrado por defecto, asi que el perfil activo (que
+   es lo que decide el {{user}} de la carta) no se veia sin abrirlo. Se repite en
+   la cabecera del grupo. */
+function updSummary() {
+    const el = $('profileSummaryLabel');
+    if (!el) return;
+    const label = state.profiles.lib[state.profiles.active]?.label || '';
+    el.textContent = label;
+    el.title = label ? 'Perfil activo: ' + label : 'Perfil activo';
+}
+
 export function renderSel() {
+    updSummary();
     const sel = profileSelect();
     sel.innerHTML = '';
     Object.values(state.profiles.lib).forEach(p => {
@@ -54,6 +66,9 @@ export function applyP() {
     sysPromptInput().value = p.sp || '';
     profileLabelInput().value = p.label || '';
     profileLabelContainer().classList.remove('hidden');
+    // Todo lo que cambia de perfil pasa por aqui; cambiar en el <select> no
+    // vuelve a pintar las opciones, asi que la cabecera se refresca aqui.
+    updSummary();
     updLP();
 }
 
@@ -135,6 +150,7 @@ export function updLbl() {
         p.label = v;
         const o = profileSelect().querySelector('[value="' + state.profiles.active + '"]');
         if (o) o.textContent = v;
+        updSummary();
     }
 }
 

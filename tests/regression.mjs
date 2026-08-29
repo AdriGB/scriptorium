@@ -454,6 +454,20 @@ assert.doesNotMatch(actionSection[0], /(?:^|\s)sticky/, 'En movil una barra fija
 // Tailwind escanea el HTML: si la clase no se genera, la barra no se pega aunque este puesta.
 assert.match(cssSource, /\.md\\:sticky/, 'md:sticky no llego al CSS generado');
 
+/* El grupo "Aventurero" esta cerrado por defecto, asi que el perfil activo (que
+   es lo que decide el {{user}} de la carta) no se veia sin abrirlo. La cabecera
+   lo repite, y hay dos caminos que la tienen que refrescar: cambiar de perfil
+   (applyP, porque el <select> no se vuelve a pintar) y renombrarlo (updLbl,
+   que edita la opcion en sitio sin pasar por renderSel). */
+const profilesSrc = await readFile(new URL('../js/profiles.js', import.meta.url), 'utf8');
+assert.match(indexSource, /id="profileSummaryLabel"/, 'Falta la etiqueta del perfil activo');
+assert.ok(/function updSummary\(/.test(profilesSrc), 'Falta quien refresca la cabecera del grupo');
+for (const fn of ['applyP', 'updLbl']) {
+    const body = profilesSrc.match(new RegExp(`function ${fn}\\([\\s\\S]*?\\n\\}`));
+    assert.ok(body, `No se encuentra el cuerpo de ${fn}`);
+    assert.match(body[0], /updSummary\(/, `${fn} no refresca la cabecera del perfil activo`);
+}
+
 /* Ctrl+Enter dentro de un campo de la carta disparaba el ritual: el repintado
    reemplaza el nodo y se lleva por delante la pila nativa de Ctrl+Z (no hay
    forma de conservarla, el elemento es otro). El atajo tiene que callarse ahi,
