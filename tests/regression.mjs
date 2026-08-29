@@ -440,6 +440,20 @@ assert.ok(applyBody, 'No se encuentra el cuerpo de applyTranslation');
 assert.match(applyBody[0], /Deshacer/, 'Aplicar la traduccion no ofrece deshacer');
 assert.match(applyBody[0], /proc\.edited\.delete/, 'Deshacer no devuelve la insignia de editado');
 
+/* "Invocar y sustituir" quedaba bajo el pliegue con los cuatro grupos del
+   lateral abiertos, y con el tambien #processHint (la pista de por que esta
+   desactivado). Se queda pegado al borde inferior del panel, pero solo desde
+   md: en movil quien desplaza es el main entero, asi que una barra fija
+   taparia la carta. */
+const actionSection = indexSource.match(/<section class="order-5[^"]*"/);
+assert.ok(actionSection, 'Falta la seccion de la accion principal');
+assert.match(actionSection[0], /md:sticky/, 'La accion principal volvio a quedar bajo el pliegue');
+assert.match(actionSection[0], /md:bottom-0/, 'La barra pegajosa no se ancla al borde inferior');
+assert.match(actionSection[0], /md:z-30/, 'Sin z-index la barra queda detras del contenido');
+assert.doesNotMatch(actionSection[0], /(?:^|\s)sticky/, 'En movil una barra fija taparia la carta');
+// Tailwind escanea el HTML: si la clase no se genera, la barra no se pega aunque este puesta.
+assert.match(cssSource, /\.md\\:sticky/, 'md:sticky no llego al CSS generado');
+
 const undefinedIdents = [];
 for (const file of jsFiles) {
     const src = await readFile(new URL(file, jsDir), 'utf8');

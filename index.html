@@ -180,7 +180,11 @@
                 <input id="importProfileInput" type="file" class="hidden" accept=".scriptorium-profile,.json,application/json"><input id="importProfilesBundleInput" type="file" class="hidden" accept=".scriptorium-profiles,.json,application/json">
             </details>
 
-            <section class="order-5 pb-6">
+            <!-- El boton es la accion principal y con los cuatro grupos abiertos
+                 quedaba bajo el pliegue, junto con #processHint (que explica por
+                 que esta desactivado). Pegajoso solo desde md: en movil el que
+                 desplaza es el main entero y una barra fija taparia la carta. -->
+            <section class="order-5 pb-6 md:sticky md:bottom-0 md:z-30 md:-mx-6 md:px-6 md:pt-4 md:pb-4 md:bg-bg/95 md:backdrop-blur-sm md:border-t md:border-border1 md:shadow-[0_-12px_24px_rgba(8,9,18,0.55)]">
                 <button id="processBtn" disabled class="w-full bg-gradient-to-br from-[#2a1f00] to-[#1c1600] border border-goldDim text-gold hover:text-gold2 hover:border-gold2 hover:shadow-[0_0_20px_rgba(201,168,76,0.2)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all rounded-lg py-3 font-cinzel text-xs tracking-wider uppercase flex items-center justify-center gap-2 relative overflow-hidden group"><div class="absolute inset-0 bg-gradient-to-br from-gold to-[#f0d070] opacity-0 group-hover:opacity-10 transition-opacity"></div><i class="fa-solid fa-bolt text-sm z-10"></i><span class="z-10 font-bold">Invocar y Sustituir</span></button>
                 <div class="text-center text-[0.65rem] text-text3 font-cinzel tracking-widest mt-2">Atajo: <kbd class="bg-surface2 border border-border2 rounded px-1 font-mono text-[0.6rem]">Ctrl</kbd> + <kbd class="bg-surface2 border border-border2 rounded px-1 font-mono text-[0.6rem]">&#8629;</kbd></div>
                 <p id="processHint" class="hidden text-center text-[0.68rem] text-text3 font-crimson italic mt-2 leading-snug"></p>
