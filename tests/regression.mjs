@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 
 const elements = new Map([
     ['sysPrompt', { value: 'Protege a {{char}} y escucha a {{user}}.' }],
@@ -73,5 +73,191 @@ assert.doesNotMatch(serviceWorkerSource, /cache\.put\('\.\/index\.html'/);
 assert.match(appSource, /controllerchange/);
 assert.match(appSource, /isLocalDevelopment/);
 assert.match(appSource, /renderJSONSafely\(true\)/);
+
+/* ── Regresiones estructurales de UX ──
+   Blinda el Tier 1: dialogo tematico en lugar de los nativos, focus trap activo
+   y los elementos nuevos presentes en el HTML. */
+const jsDir = new URL('../js/', import.meta.url);
+const jsFiles = (await readdir(jsDir)).filter(f => f.endsWith('.js'));
+
+let nativeConfirms = 0;
+let trapFocusCalls = 0;
+for (const file of jsFiles) {
+    const src = await readFile(new URL(file, jsDir), 'utf8');
+    // Cuenta solo `confirm(` suelto: excluye window.confirm (fallback deliberado)
+    // y no confunde con confirmDialog( / closeConfirmDialog(.
+    nativeConfirms += (src.match(/(?<![\w.])confirm\(/g) || []).length;
+    trapFocusCalls += (src.match(/trapFocus\(/g) || []).length;
+}
+assert.equal(nativeConfirms, 0, 'Quedan dialogos nativos sin migrar a confirmDialog');
+// El import muerto de trapFocus estuvo en el repo sin que nadie lo llamara.
+assert.ok(trapFocusCalls >= 2, 'trapFocus debe declararse e invocarse');
+
+const indexSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+for (const id of ['confirmModal', 'confirmOkBtn', 'confirmCancelBtn', 'confirmExtraBtn', 'toastAction']) {
+    assert.match(indexSource, new RegExp(`id="${id}"`), `Falta #${id} en index.html`);
+}
+
+// El undo depende de que el snapshot y la sesion del vault compartan forma.
+const appSourceFull = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
+assert.match(appSourceFull, /function snapState\(\)/);
+assert.match(appSourceFull, /async function hydrateFrom\(saved\)/);
+assert.match(appSourceFull, /label: 'Deshacer'/);
+
+/* ── Tier 2 de UX ── */
+
+// Buscador de la boveda: filtro propia pestaña y resaltado.
+const vaultSource = await readFile(new URL('../js/vault.js', import.meta.url), 'utf8');
+assert.match(vaultSource, /function buildExcerpt\(/, 'Falta buildExcerpt()');
+assert.match(vaultSource, /const excerpt = highlight\(/, 'La fila debe construir su extracto');
+assert.match(vaultSource, /resetSearch\(\);/, 'Al abrir la boveda hay que limpiar el filtro anterior');
+assert.match(vaultSource, /id="vaultSearch"/);
+assert.match(vaultSource, /id="vaultSearchCount"/);
+
+// Sidebar: grupos no excluyentes y con estado persistido (la clave existia sin usarse).
+const uiSource = await readFile(new URL('../js/ui.js', import.meta.url), 'utf8');
+assert.doesNotMatch(uiSource, /other\.open = false/, 'El acordeon del sidebar volvio a ser excluyente');
+assert.match(uiSource, /STORAGE_KEYS\.SIDEBAR_GROUPS/, 'El estado de los grupos del sidebar no se persiste');
+
+// Buscador principal: contador, resaltado y coincidencia por textContent.
+assert.match(uiSource, /\$\('searchCount'\)/, 'El contador #searchCount existe en el HTML pero no se usa');
+assert.match(uiSource, /function highlightCard\(/);
+// Con innerText una tarjeta ya oculta deja de coincidir y no vuelve a aparecer nunca.
+const cardTextFn = uiSource.match(/function cardText\(card\)\s*\{[\s\S]*?\n\}/);
+assert.ok(cardTextFn, 'Falta cardText() en ui.js');
+assert.doesNotMatch(cardTextFn[0], /innerText/, 'cardText debe usar textContent, no innerText');
+assert.match(cardTextFn[0], /textContent/);
+assert.match(uiSource, /fields:rendered/, 'Sin reaplicar la busqueda tras repintar, el filtro se pierde');
+
+// El lorebook usa la misma estructura .field-card, asi que el buscador tambien aplica.
+assert.doesNotMatch(uiSource, /id === 'tabJson' \|\| id === 'tabLorebook'/, 'El buscador volvio a ocultarse en el lorebook');
+assert.match(uiSource, /\$\('processedView'\), \$\('rawView'\), \$\('lorebookView'\)/, 'El filtro debe cubrir las tres vistas de campos');
+
+// Empty states en las vistas de campos.
+const editorSource = await readFile(new URL('../js/editor.js', import.meta.url), 'utf8');
+assert.match(editorSource, /export function emptyFieldsState\(/);
+assert.match(editorSource, /fields:rendered/);
+// renderRaw, renderProc (vacio y con datos) y renderLorebook.
+assert.ok((editorSource.match(/announceRender\(\)/g) || []).length >= 4, 'Falta anunciar el repintado en alguna vista');
+
+/* ── Tier 3: UI muerta cableada ── */
+assert.match(appSourceFull, /initShortcutsModal\(\)/, 'El modal de atajos no se inicializa');
+assert.match(appSourceFull, /initWelcome\(\)/, 'El panel de bienvenida no se inicializa');
+assert.match(appSourceFull, /closeShortcuts\(\)/, 'Esc no cierra el modal de atajos');
+assert.match(appSourceFull, /refreshProcessHint\(\)/, 'El #processHint sigue sin usar');
+// El focus trap se resuelve por una lista de ids: el modal tiene que estar en ella.
+assert.match(uiSource, /const MODAL_IDS = \[[^\]]*'shortcutsModal'/);
+assert.match(uiSource, /STORAGE_KEYS\.SEEN_WELCOME/);
+
+/* ── Identificadores sin declarar en template literals ──
+   `${excerpt}` estuvo en vault.js sin definirse: esbuild lo empaqueta igual y
+   solo revienta en tiempo de ejecucion, al pintar la lista de la boveda. */
+const GLOBALS = new Set([
+    'window', 'document', 'console', 'navigator', 'location', 'localStorage', 'sessionStorage',
+    'indexedDB', 'IDBKeyRange', 'alert', 'structuredClone', 'performance',
+    'Math', 'JSON', 'Object', 'Array', 'String', 'Number', 'Boolean', 'Date', 'RegExp', 'Error',
+    'TypeError', 'RangeError', 'SyntaxError', 'Set', 'Map', 'WeakSet', 'WeakMap', 'Promise',
+    'Symbol', 'Proxy', 'Reflect', 'Intl', 'BigInt',
+    'Uint8Array', 'Uint8ClampedArray', 'Uint16Array', 'Uint32Array', 'Int8Array', 'Int32Array',
+    'Float32Array', 'Float64Array', 'ArrayBuffer', 'DataView', 'TextDecoder', 'TextEncoder',
+    'Blob', 'File', 'FileReader', 'FileList', 'FormData', 'URL', 'URLSearchParams', 'Event',
+    'CustomEvent', 'EventTarget', 'NodeFilter', 'Node', 'Element', 'HTMLElement', 'Image',
+    'MutationObserver', 'IntersectionObserver', 'ResizeObserver', 'AbortController', 'DOMParser',
+    'requestAnimationFrame', 'cancelAnimationFrame', 'setTimeout', 'clearTimeout',
+    'setInterval', 'clearInterval', 'queueMicrotask', 'fetch', 'Headers', 'Request', 'Response',
+    'parseInt', 'parseFloat', 'isNaN', 'isFinite', 'encodeURIComponent', 'decodeURIComponent',
+    'encodeURI', 'decodeURI', 'globalThis', 'undefined', 'NaN', 'Infinity', 'true', 'false', 'null'
+]);
+
+const DECL_RE = /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)|(?:\bfunction\s*\*?\s*)([A-Za-z_$][\w$]*)|(?:\bclass\s+)([A-Za-z_$][\w$]*)|(?:\bcatch\s*\(\s*)([A-Za-z_$][\w$]*)/g;
+
+function declaredNames(src) {
+    const names = new Set();
+    for (const m of src.matchAll(DECL_RE)) names.add(m[1] || m[2] || m[3] || m[4]);
+    /* Destructuring en declaraciones y parametros. Ojo: un `{...}` generico no sirve,
+       porque el propio `${x}` del template literal casa con el y daria por declarado
+       cualquier identificador. Solo se acepta en posicion de declaracion. */
+    const addParts = (list) => {
+        for (const part of list.split(',')) {
+            const id = part.split(':').pop().trim().replace(/^\.\.\./, '');
+            if (/^[A-Za-z_$][\w$]*$/.test(id)) names.add(id);
+        }
+    };
+    for (const m of src.matchAll(/(?:const|let|var)\s*\{([^{}]*)\}/g)) addParts(m[1]);
+    for (const m of src.matchAll(/(?:const|let|var)\s*\[([^\]]*)\]/g)) addParts(m[1]);
+    for (const m of src.matchAll(/function\s*[A-Za-z_$\w]*\s*\(\s*\{([^{}]*)\}/g)) addParts(m[1]);
+    for (const m of src.matchAll(/\(\s*\{([^{}]*)\}\s*\)\s*=>/g)) addParts(m[1]);
+    for (const m of src.matchAll(/import\s+([^'";]+?)\s+from/g)) {
+        const clause = m[1].trim();
+        if (clause.startsWith('*')) { const id = clause.split(/\s+as\s+/)[1]; if (id) names.add(id.trim()); continue; }
+        const braced = clause.match(/\{([^}]*)\}/);
+        const parts = braced ? braced[1].split(',') : [clause.split(',')[0]];
+        for (const part of parts) {
+            const id = part.trim().split(/\s+as\s+/).pop().trim();
+            if (/^[A-Za-z_$][\w$]*$/.test(id)) names.add(id);
+        }
+    }
+    // Parametros: function f(a, b) {}, (a) => ..., async ({ x }) => {}
+    for (const m of src.matchAll(/(?:function\s*[A-Za-z_$\w]*\s*)?\(([^()]*)\)\s*(?:=>|\{|:\s)/g)) {
+        for (const part of m[1].split(',')) {
+            const id = part.split('=')[0].trim().replace(/^\.\.\./, '').replace(/:\s*[\w<>[\]{}\s.|]+$/, '').trim();
+            if (/^[A-Za-z_$][\w$]*$/.test(id)) names.add(id);
+        }
+    }
+    return names;
+}
+
+/* ── Logica pura del buscador de la boveda ──
+   Se importa el modulo real en vez de replicar la funcion: fue justo aqui donde
+   se colo un `${excerpt}` sin definir que reventaba al pintar la lista. */
+const { highlight, buildExcerpt } = await import(new URL('../js/vault.js', import.meta.url));
+
+assert.equal(highlight('Ada Lovelace', 'ada'), '<mark class="search-hit">Ada</mark> Lovelace');
+assert.equal(highlight('la casa de la pradera', 'la'),
+    '<mark class="search-hit">la</mark> casa de <mark class="search-hit">la</mark> pradera');
+// El texto se escapa trozo a trozo: ni el HTML del campo ni la query con caracteres
+// de expresion regular pueden romper el marcado.
+assert.equal(highlight('<b>x</b>', 'b'), '&lt;<mark class="search-hit">b</mark>&gt;x&lt;/<mark class="search-hit">b</mark>&gt;');
+assert.equal(highlight('a.b+c', '.'), 'a<mark class="search-hit">.</mark>b+c');
+assert.equal(highlight('a & b', ''), 'a &amp; b');
+
+const richChar = { card: { data: { description: 'Palabra inicial. ' + 'Relleno. '.repeat(30) + 'Aqui aparece dragon y sigue el texto.' } } };
+const excerpt = buildExcerpt(richChar, 'dragon');
+assert.ok(excerpt.includes('dragon'), 'El extracto debe centrarse en la coincidencia');
+assert.ok(excerpt.length <= 145, 'El extracto debe estar acotado, mide ' + excerpt.length);
+assert.ok(highlight(excerpt, 'dragon').includes('<mark class="search-hit">dragon</mark>'));
+assert.equal(buildExcerpt({ card: { data: {} } }, 'x'), '');
+assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
+
+/* ─── Elementos muertos ───
+   Un id en el HTML que nadie referencia es UI muerta. Asi llevaban tiempo el modal
+   de atajos (boton y tecla "?" sin cablear) y el panel de bienvenida: completos en
+   el HTML, invisibles en la practica. */
+const allJs = (await Promise.all(jsFiles.map(f => readFile(new URL(f, jsDir), 'utf8')))).join('\n');
+const cssSource = await readFile(new URL('../assets/app.css', import.meta.url), 'utf8');
+const htmlWithoutIds = indexSource.replace(/\sid="[^"]+"/g, '');
+// Contenedores puramente estructurales: no necesitan comportamiento ni estilo propio.
+const STRUCTURAL_IDS = new Set(['resultsArea']);
+const deadIds = [...new Set([...indexSource.matchAll(/\sid="([^"]+)"/g)].map(m => m[1]))]
+    .filter(id => !STRUCTURAL_IDS.has(id))
+    .filter(id => !allJs.includes(`'${id}`) && !allJs.includes(`"${id}`) && !allJs.includes('#' + id))
+    .filter(id => !cssSource.includes('#' + id))
+    // Referencias internas del HTML: for=, aria-labelledby=, href=#...
+    .filter(id => !htmlWithoutIds.includes(id));
+assert.deepEqual(deadIds, [], 'Ids del HTML sin referenciar en JS, CSS ni en el propio HTML');
+
+const undefinedIdents = [];
+for (const file of jsFiles) {
+    const src = await readFile(new URL(file, jsDir), 'utf8');
+    const declared = declaredNames(src);
+    /* Cubre `${x}` y tambien `${x ? a : b}`, `${x.length}`...: basta con que la
+       expresion EMPIECE por un identificador. El bug real era `${excerpt ? ...}`,
+       que con el patron estricto de `${x}` se colaba. */
+    for (const m of src.matchAll(/\$\{\s*([A-Za-z_$][\w$]*)\s*(?=[\}?.,)\]+\-*/%|&<>=:;])/g)) {
+        const id = m[1];
+        if (!declared.has(id) && !GLOBALS.has(id)) undefinedIdents.push(`${file} -> ${id}`);
+    }
+}
+assert.deepEqual(undefinedIdents, [], 'Identificadores sin declarar dentro de template literals');
 
 console.log('Regresiones funcionales: OK');

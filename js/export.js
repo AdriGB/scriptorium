@@ -3,21 +3,30 @@ import { $, showToast, copyClip } from './utils.js';
 import { buildExp } from './chara-card.js';
 import { injectCharaToPng } from './png-writer.js';
 
+/* El PNG base puede venir de la carta cargada (state.file.pngFile) o de una
+   seleccion manual. Sincroniza el nombre mostrado y el estado del boton. */
+export function syncPngControls() {
+    const picked = $('exportPngInput')?.files?.[0] || null;
+    const file = picked || state.file.pngFile || null;
+    const nameEl = $('exportPngName');
+    const btnEl = $('exportDownloadPng');
+    if (nameEl) nameEl.textContent = file ? file.name + (picked ? '' : ' · de la carta cargada') : '';
+    if (btnEl) btnEl.disabled = !file;
+    return file;
+}
+
 export function openExpModal() {
     $('exportJsonPreview').value = JSON.stringify(buildExp(), null, 2);
+    syncPngControls();
     $('exportModal').classList.remove('hidden'); $('exportModal').classList.add('flex');
     $('exportClose').focus();
 }
 
 export function closeExpModal() {
     $('exportModal').classList.add('hidden'); $('exportModal').classList.remove('flex');
-    // Reset PNG input al cerrar
     const pngInput = $('exportPngInput');
     if (pngInput) pngInput.value = '';
-    const pngName = $('exportPngName');
-    if (pngName) pngName.textContent = '';
-    const pngBtn = $('exportDownloadPng');
-    if (pngBtn) pngBtn.disabled = true;
+    syncPngControls();
 }
 
 export async function copyAll() {
@@ -84,12 +93,13 @@ export async function copyAll() {
 }
 
 export async function exportPng(basePngFile) {
-    if (!basePngFile) {
+    const file = basePngFile || state.file.pngFile;
+    if (!file) {
         showToast('Selecciona una imagen PNG.', 'info');
         return;
     }
     try {
-        const blob = await injectCharaToPng(basePngFile, buildExp());
+        const blob = await injectCharaToPng(file, buildExp());
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;

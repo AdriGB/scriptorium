@@ -1,5 +1,5 @@
 import state, { STORAGE_KEYS } from './state.js';
-import { $, Storage, showToast, trapFocus } from './utils.js';
+import { $, Storage, showToast, trapFocus, closeConfirmDialog } from './utils.js';
 import { renderJSON, updJS, applyJE, updFab, renderLorebook, setJsonMode } from './editor.js';
 
 /* ─── Canvas ─── */
@@ -43,10 +43,19 @@ export function initCanvas() {
 export function initSidebar() {
     const leftPanel = $('leftPanel'), btn = $('sidebarToggleBtn');
     const groups = [...leftPanel.querySelectorAll('.sidebar-group')];
-    groups.forEach(group => group.addEventListener('toggle', () => {
-        if (!group.open) return;
-        groups.forEach(other => { if (other !== group) other.open = false; });
-    }));
+
+    /* Los grupos ya NO son excluyentes: antes abrir uno cerraba los demas, lo que
+       obligaba a reabrirlos cada vez. En su lugar se recuerda el estado de cada uno. */
+    const savedGroups = Storage.get(STORAGE_KEYS.SIDEBAR_GROUPS, {}) || {};
+    groups.forEach((group, i) => {
+        const id = group.dataset.group || 'g' + i;
+        if (typeof savedGroups[id] === 'boolean') group.open = savedGroups[id];
+        group.addEventListener('toggle', () => {
+            const map = Storage.get(STORAGE_KEYS.SIDEBAR_GROUPS, {}) || {};
+            map[id] = group.open;
+            Storage.set(STORAGE_KEYS.SIDEBAR_GROUPS, map);
+        });
+    });
     function setCollapsed(c) {
         leftPanel.classList.toggle('panel-collapsed', c);
         btn.classList.toggle('is-collapsed', c);
@@ -71,7 +80,9 @@ export function setActiveTab(id) {
     $('rawView').classList.toggle('hidden', id !== 'tabRaw');
     $('jsonView').classList.toggle('hidden', id !== 'tabJson');
     $('lorebookView').classList.toggle('hidden', id !== 'tabLorebook');
-    $('searchContainer').classList.toggle('hidden', id === 'tabJson' || id === 'tabLorebook');
+    // El buscador tambien sirve en el lorebook: sus entradas usan la misma
+    // estructura .field-card. Solo se oculta en JSON, que es un editor de texto.
+    $('searchContainer').classList.toggle('hidden', id === 'tabJson');
     $('processedView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
     $('rawView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
     if (id === 'tabJson' && state.file.uploaded && !state.jsonEditor.dirty) {
@@ -80,7 +91,7 @@ export function setActiveTab(id) {
     }
     if (id === 'tabLorebook') renderLorebook();
     const si = $('searchInput');
-    if (si.value && id !== 'tabJson' && id !== 'tabLorebook') si.dispatchEvent(new Event('input'));
+    if (si.value && id !== 'tabJson') si.dispatchEvent(new Event('input'));
     updFab();
 }
 
@@ -91,6 +102,59 @@ export function initTabs() {
 }
 
 /* ─── Search ─── */
+
+/**
+ * Texto comparable de una tarjeta: titulo + cuerpo.
+ * Se usa textContent y no innerText: innerText devuelve cadena vacia en las tarjetas
+ * ocultas, asi que una tarjeta filtrada por una busqueda anterior no volvia a aparecer
+ * nunca aunque coincidiera con la nueva.
+ */
+function cardText(card) {
+    const nameInput = card.querySelector('.field-card-head .editor-field-name');
+    const title = nameInput ? (nameInput.value || '') : (card.querySelector('.field-card-head span.truncate')?.textContent || '');
+    const body = card.querySelector('.field-card-body');
+    return (title + ' ' + (body?.textContent || '')).toLowerCase();
+}
+
+/** Retira los resaltados anteriores dejando el texto intacto. */
+function clearHighlights(root) {
+    root.querySelectorAll('mark.search-hit').forEach(m => {
+        const parent = m.parentNode;
+        if (!parent) return;
+        parent.replaceChild(document.createTextNode(m.textContent), m);
+        parent.normalize();
+    });
+}
+
+/**
+ * Resalta la coincidencia dentro de la tarjeta. Omite los contenteditable: meter
+ * HTML ahi romperia la edicion en linea de la vista procesada.
+ */
+function highlightCard(card, q) {
+    if (!q) return;
+    const walker = document.createTreeWalker(card, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+            const el = node.parentElement;
+            if (!node.nodeValue || !el) return NodeFilter.FILTER_REJECT;
+            if (el.closest('[contenteditable="true"]')) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+        }
+    });
+    const nodes = [];
+    let n;
+    while ((n = walker.nextNode())) nodes.push(n);
+    for (const node of nodes) {
+        const at = node.nodeValue.toLowerCase().indexOf(q);
+        if (at < 0) continue;
+        const hit = node.splitText(at);
+        if (hit.nodeValue.length > q.length) hit.splitText(q.length);
+        const mark = document.createElement('mark');
+        mark.className = 'search-hit';
+        mark.textContent = hit.nodeValue;
+        hit.parentNode.replaceChild(mark, hit);
+    }
+}
+
 export function initSearch() {
     const searchInput = $('searchInput'), searchClearBtn = $('searchClearBtn');
 
@@ -107,25 +171,49 @@ export function initSearch() {
         } else if (nr) nr.remove();
     }
 
-    searchInput.addEventListener('input', e => {
-        const q = e.target.value.toLowerCase();
+    function setCounter(q, shown, total) {
+        const counter = $('searchCount');
+        if (!counter) return;
+        counter.classList.toggle('hidden', !q);
+        counter.textContent = q ? `${shown} de ${total}` : '';
+    }
+
+    function runSearch() {
+        const q = (searchInput.value || '').trim().toLowerCase();
         searchClearBtn.classList.toggle('hidden', !q);
+
+        // Los resaltados se limpian en todas las vistas de campos: al cambiar de
+        // pestana las tarjetas se vuelven a mostrar y no deben conservar marcas viejas.
+        [$('processedView'), $('rawView'), $('lorebookView')].forEach(v => v && clearHighlights(v));
+
+        // El JSON es un editor de texto: el filtro por tarjetas no aplica ahi.
         if (!$('jsonView').classList.contains('hidden')) return;
-        if (!$('lorebookView').classList.contains('hidden')) return;
-        const av = $('processedView').classList.contains('hidden') ? $('rawView') : $('processedView');
+
+        const av = !$('processedView').classList.contains('hidden') ? $('processedView')
+            : !$('rawView').classList.contains('hidden') ? $('rawView')
+                : $('lorebookView');
+        const cards = [...av.querySelectorAll('.field-card')];
         let vc = 0;
-        av.querySelectorAll('.field-card').forEach(c => { const m = !q || c.innerText.toLowerCase().includes(q); c.style.display = m ? '' : 'none'; if (m) vc++; });
+        cards.forEach(c => {
+            const m = !q || cardText(c).includes(q);
+            c.style.display = m ? '' : 'none';
+            if (m) { vc++; if (q) highlightCard(c, q); }
+        });
         updNR(q, vc, av);
-    });
+        setCounter(q, vc, cards.length);
+    }
+
+    searchInput.addEventListener('input', runSearch);
 
     searchClearBtn.addEventListener('click', () => {
         searchInput.value = '';
-        $('processedView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
-        $('rawView').querySelectorAll('.field-card').forEach(c => c.style.display = '');
-        const av = $('processedView').classList.contains('hidden') ? $('rawView') : $('processedView');
-        const nr = av.querySelector('.no-results-state'); if (nr) nr.remove();
+        runSearch();
         searchInput.focus();
     });
+
+    // Tras repintar (procesar la carta, cargar otra, deshacer...) el filtro hay que
+    // reaplicarlo o las tarjetas volverian a aparecer sin filtrar ni resaltar.
+    document.addEventListener('fields:rendered', () => { if (searchInput.value.trim()) runSearch(); });
 }
 
 /* ─── About modal ─── */
@@ -134,6 +222,85 @@ export function initAbout() {
     const close = () => { $('aboutModal').classList.add('hidden'); $('aboutModal').classList.remove('flex'); };
     $('aboutClose').addEventListener('click', close);
     $('aboutBackdrop').addEventListener('click', close);
+}
+
+/* ─── Confirm dialog ───
+   confirmDialog / closeConfirmDialog viven en utils.js junto a showToast, para que
+   editor.js y vault.js puedan usarlos sin importar ui.js (evita el ciclo de modulos). */
+export function initConfirmModal() {
+    $('confirmOkBtn').addEventListener('click', () => closeConfirmDialog('ok'));
+    $('confirmCancelBtn').addEventListener('click', () => closeConfirmDialog('cancel'));
+    $('confirmExtraBtn').addEventListener('click', () => closeConfirmDialog('extra'));
+    $('confirmClose').addEventListener('click', () => closeConfirmDialog('cancel'));
+    $('confirmBackdrop').addEventListener('click', () => closeConfirmDialog('cancel'));
+}
+
+/* ─── Shortcuts modal ───
+   Estaba entero en el HTML —boton, lista de atajos, cierre— pero ningun modulo lo
+   abria: el boton "Atajos" no hacia nada y la tecla "?" que anuncia tampoco. */
+let shortcutsOpen = false;
+
+export function openShortcuts() {
+    const m = $('shortcutsModal');
+    if (!m) return false;
+    m.classList.remove('hidden');
+    m.classList.add('flex');
+    shortcutsOpen = true;
+    $('shortcutsClose')?.focus();
+    return true;
+}
+
+export function closeShortcuts() {
+    const m = $('shortcutsModal');
+    if (!m || m.classList.contains('hidden')) return false;
+    m.classList.add('hidden');
+    m.classList.remove('flex');
+    shortcutsOpen = false;
+    return true;
+}
+
+export function initShortcutsModal() {
+    $('shortcutsBtn')?.addEventListener('click', () => (shortcutsOpen ? closeShortcuts() : openShortcuts()));
+    $('shortcutsClose')?.addEventListener('click', closeShortcuts);
+    $('shortcutsBackdrop')?.addEventListener('click', closeShortcuts);
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== '?' || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.target?.closest?.('input,textarea,[contenteditable="true"]')) return;
+        // No se abre encima de otro modal: Esc resolveria el de debajo y dejaria
+        // este abierto sin manera evidente de cerrarlo.
+        if (MODAL_IDS.some(id => id !== 'shortcutsModal' && !$(id)?.classList.contains('hidden'))) return;
+        e.preventDefault();
+        if (shortcutsOpen) closeShortcuts(); else openShortcuts();
+    });
+}
+
+/* ─── Welcome ───
+   El panel "Como funciona" vivia oculto en el HTML sin que nada lo mostrara.
+   Se ve la primera vez y se recuerda el descarte en localStorage. */
+export function initWelcome() {
+    const panel = $('welcomePanel');
+    if (!panel) return;
+    panel.classList.toggle('hidden', Storage.getBool(STORAGE_KEYS.SEEN_WELCOME));
+    $('welcomeDismiss')?.addEventListener('click', () => {
+        panel.classList.add('hidden');
+        Storage.setBool(STORAGE_KEYS.SEEN_WELCOME, true);
+    });
+}
+
+/* ─── Focus trap para todos los modales ───
+   Se resuelve por delegacion para que tambien cubra modales creados dinamicamente
+   (p. ej. #vaultModal, que inyecta vault.js al abrir la boveda).
+   Ordenados por z-index: shortcuts y confirm van a z-[70], por encima del resto. */
+const MODAL_IDS = ['shortcutsModal', 'confirmModal', 'vaultModal', 'aboutModal', 'exportModal', 'addFieldModal', 'expandModal'];
+
+export function initFocusTraps() {
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Tab') return;
+        for (const id of MODAL_IDS) {
+            const el = $(id);
+            if (el && !el.classList.contains('hidden')) { trapFocus(e, el); return; }
+        }
+    });
 }
 
 /* ─── Expand modal listeners ─── */
@@ -208,17 +375,13 @@ export function initExportModal() {
         document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
         showToast('Descargado');
     });
-    $('exportPngInput')?.addEventListener('change', (e) => {
-        const file = e.target.files?.[0];
-        const nameEl = $('exportPngName');
-        const btnEl = $('exportDownloadPng');
-        if (file) { if (nameEl) nameEl.textContent = file.name; if (btnEl) btnEl.disabled = false; }
-        else { if (nameEl) nameEl.textContent = ''; if (btnEl) btnEl.disabled = true; }
+    $('exportPngInput')?.addEventListener('change', async () => {
+        const { syncPngControls } = await import('./export.js');
+        syncPngControls();
     });
     $('exportDownloadPng')?.addEventListener('click', async () => {
         const { exportPng } = await import('./export.js');
-        const file = $('exportPngInput')?.files?.[0];
-        await exportPng(file);
+        await exportPng($('exportPngInput')?.files?.[0] || state.file.pngFile);
     });
 }
 

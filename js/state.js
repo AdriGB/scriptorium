@@ -1,8 +1,10 @@
 export const STORAGE_KEYS = {
     SIDEBAR: 'scriptorium_sidebar_collapsed',
+    SIDEBAR_GROUPS: 'scriptorium_sidebar_groups',
     PROFILES: 'scriptorium_profiles',
     PROFILES_LEGACY: 'scriptorium_profile',
-    TR_PRIVACY: 'scriptorium_tr_privacy_accepted'
+    TR_PRIVACY: 'scriptorium_tr_privacy_accepted',
+    SEEN_WELCOME: 'scriptorium_seen_welcome'
 };
 
 export const VF = { SP: 'system_prompt_global', UP: 'mi_persona' };
@@ -25,7 +27,10 @@ export const RESERVED_KEYS = new Set([
 ]);
 
 const state = {
-    file: { uploaded: null, extracted: {} },
+    // pngFile: File original cuando la carta se importo desde PNG. Permite
+    // reexportar sin volver a seleccionar la misma imagen. No entra en la sesion
+    // del vault (storage.js solo persiste file.uploaded).
+    file: { uploaded: null, extracted: {}, pngFile: null },
     proc: { data: {}, edited: new Set() },
     editor: { active: false, added: new Set(), removed: new Set(), delKey: null, delTm: null },
     jsonEditor: { snap: null, dirty: false, err: null, mode: 'tree' },

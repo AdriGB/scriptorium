@@ -1,19 +1,20 @@
 import state, { getExtracted } from './state.js';
-import { $, showToast, deepClone } from './utils.js';
+import { $, showToast, deepClone, confirmDialog, closeConfirmDialog } from './utils.js';
 import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
 import vault from './storage.js';
 import { openVault, saveCurrentToVault } from './vault.js';
 import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel, exportCurrentProfile, importProfileFile, exportAllProfiles, importProfilesBundle } from './profiles.js';
-import { processText, renderRaw, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount } from './editor.js';
+import { processText, renderRaw, renderProc, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount, emptyFieldsState } from './editor.js';
 import { openExpModal, closeExpModal, copyAll } from './export.js';
-import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor } from './ui.js';
+import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor, initConfirmModal, initFocusTraps, initShortcutsModal, initWelcome, closeShortcuts } from './ui.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
     try {
         initCanvas(); initSidebar(); initTabs(); initSearch(); initAbout();
         initExpandModal(); initAddFieldModal(); initExportModal(); initJsonEditor();
+        initConfirmModal(); initFocusTraps(); initShortcutsModal(); initWelcome();
     } catch (err) { console.error('[Init] error:', err); }
 
     const fileInput = $('dropzone-file');
@@ -30,6 +31,24 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const hasCardContent = (count = Object.keys(getExtracted()).length) =>
         count > 0 || Object.keys(state.proc.data).length > 0 || state.characterBook.present;
+
+    /* Explica por que "Invocar y Sustituir" esta desactivado, o que falta por
+       rellenar. El parrafo #processHint existia oculto en el HTML sin usarse. */
+    function refreshProcessHint() {
+        const hint = $('processHint');
+        if (!hint) return;
+        const count = Object.keys(getExtracted()).length + Object.keys(state.proc.data).length;
+        let msg = '';
+        if (!state.file.uploaded && count === 0 && !state.characterBook.present) {
+            msg = 'Carga una carta JSON o PNG para empezar.';
+        } else if (count === 0 && !state.characterBook.present) {
+            msg = 'El archivo no contiene campos compatibles.';
+        } else if (count > 0 && !userNameInput?.value.trim() && !sysPromptInput?.value.trim()) {
+            msg = 'Rellena tu nombre o el prompt de sistema para sustituir las marcas {{char}} y {{user}}.';
+        }
+        hint.textContent = msg;
+        hint.classList.toggle('hidden', !msg);
+    }
 
     function setWorkspaceLoaded(loaded, fileName = '', count = 0) {
         $('workspaceEmpty')?.classList.toggle('hidden', loaded);
@@ -58,12 +77,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /* ── Snapshot / restauracion ──
+       Mismo formato que la sesion del vault (storage.js saveSession), de modo que
+       la recuperacion de sesion y el "deshacer" compartan el mismo camino. */
+    function snapState() {
+        return {
+            savedAt: Date.now(),
+            file: state.file.uploaded,
+            extracted: { ...state.file.extracted },
+            procData: { ...state.proc.data },
+            procEdited: [...state.proc.edited],
+            editorAdded: [...state.editor.added],
+            editorRemoved: [...state.editor.removed],
+            characterBook: deepClone(state.characterBook),
+            altGreetings: deepClone(state.altGreetings),
+            charName: charNameInput?.value || '',
+            userName: userNameInput?.value || '',
+            sysPrompt: sysPromptInput?.value || '',
+            userPersona: userPersonaInput?.value || '',
+            activeProfileId: state.profiles.active,
+            editorActive: state.editor.active,
+            fileName: $('statusFileName')?.textContent || '',
+            pngFile: state.file.pngFile || null
+        };
+    }
+
+    async function hydrateFrom(saved) {
+        state.file.uploaded = saved.file ?? null;
+        state.file.pngFile = saved.pngFile ?? null;
+        state.file.extracted = { ...(saved.extracted || {}) };
+        state.proc.data = { ...(saved.procData || {}) };
+        state.proc.edited = new Set(saved.procEdited || []);
+        state.editor.added = new Set(saved.editorAdded || []);
+        state.editor.removed = new Set(saved.editorRemoved || []);
+        state.characterBook = deepClone(saved.characterBook || { present: false, metadata: {}, entries: [] });
+        state.altGreetings = deepClone(saved.altGreetings || { original: '', list: [], current: 0 });
+
+        if (saved.activeProfileId && state.profiles.lib[saved.activeProfileId]) {
+            state.profiles.active = saved.activeProfileId;
+            renderSel();
+            applyP();
+        }
+
+        if (charNameInput) charNameInput.value = saved.charName ?? '';
+        if (userNameInput) userNameInput.value = saved.userName ?? '';
+        if (sysPromptInput) sysPromptInput.value = saved.sysPrompt ?? '';
+        if (userPersonaInput) userPersonaInput.value = saved.userPersona ?? '';
+        updLP();
+
+        const restoredCount = Object.keys(state.file.extracted).length;
+        if (processBtn) processBtn.disabled = !hasCardContent(restoredCount);
+        refreshProcessHint();
+        setWorkspaceLoaded(true, saved.fileName || (saved.charName ? 'Sesion: ' + saved.charName : 'Sesion recuperada'), restoredCount);
+        renderRaw();
+        updLorebookCount();
+        if (restoredCount > 0 || Object.keys(state.proc.data).length > 0 || sysPromptInput?.value.trim()) processText();
+        else { renderProc(); if (state.characterBook.present) $('tabLorebook')?.click(); }
+        renderJSONSafely();
+        if (saved.editorActive && !state.editor.active) togEd();
+    }
+
     if (!fileInput || !dropzone) { console.error('DOM critico no encontrado'); return; }
 
     /* ── Profiles BEFORE vault session ── */
     loadProfiles();
     renderJSONSafely();
     setWorkspaceLoaded(false);
+    refreshProcessHint();
 
     /* ── Vault init ── */
     let dbReady = false;
@@ -81,45 +161,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (saved && saved.file) {
                 const minAgo = Math.round((Date.now() - saved.savedAt) / 60000);
                 const timeText = minAgo < 1 ? 'hace un momento' : `hace ${minAgo} min`;
-                const recover = confirm(
-                    `Se encontro una sesion guardada ${timeText}.\n\n` +
-                    `Personaje: ${saved.charName || '(sin nombre)'}\n` +
-                    `Campos: ${Object.keys(saved.procData || {}).length}\n\n` +
-                    `¿Deseas recuperarla?`
-                );
-                if (recover) {
-                    state.file.uploaded = saved.file;
-                    Object.assign(state.file.extracted, saved.extracted || {});
-                    Object.assign(state.proc.data, saved.procData || {});
-                    state.proc.edited = new Set(saved.procEdited || []);
-                    state.editor.added = new Set(saved.editorAdded || []);
-                    state.editor.removed = new Set(saved.editorRemoved || []);
-                    state.characterBook = deepClone(saved.characterBook || state.characterBook);
-                    state.altGreetings = deepClone(saved.altGreetings || state.altGreetings);
-
-                    if (saved.activeProfileId && state.profiles.lib[saved.activeProfileId]) {
-                        state.profiles.active = saved.activeProfileId;
-                        renderSel();
-                        applyP();
-                    }
-
-                    charNameInput.value = saved.charName ?? '';
-                    userNameInput.value = saved.userName ?? '';
-                    sysPromptInput.value = saved.sysPrompt ?? '';
-                    userPersonaInput.value = saved.userPersona ?? '';
-
-                    const restoredCount = Object.keys(state.file.extracted).length;
-                    processBtn.disabled = !hasCardContent(restoredCount);
-                    setWorkspaceLoaded(true, saved.charName ? `Sesion: ${saved.charName}` : 'Sesion recuperada', restoredCount);
-                    if (restoredCount > 0 || Object.keys(state.proc.data).length > 0 || sysPromptInput.value.trim()) processText();
-                    else if (state.characterBook.present) $('tabLorebook')?.click();
+                const choice = await confirmDialog({
+                    title: 'Sesion encontrada',
+                    message: `Se encontro una sesion guardada ${timeText}.\n\n` +
+                        `Personaje: ${saved.charName || '(sin nombre)'}\n` +
+                        `Campos: ${Object.keys(saved.procData || {}).length}`,
+                    okLabel: 'Recuperar',
+                    extraLabel: 'Mas tarde',
+                    cancelLabel: 'Descartar',
+                    danger: 'cancel',
+                    icon: 'fa-box-archive'
+                });
+                if (choice === 'ok') {
+                    await hydrateFrom(saved);
                     state.vault.dirty = false;
-
-                    if (saved.editorActive && !state.editor.active) togEd();
-
                     showToast('Sesion recuperada');
-                } else {
+                } else if (choice === 'cancel') {
+                    // Antes cualquier "Cancelar" borraba la sesion sin vuelta atras.
+                    // Ahora "Descartar" es explicito y "Mas tarde" la conserva.
                     await vault.clearSession();
+                    showToast('Sesion descartada', 'info');
                 }
             }
         } catch (e) { console.warn('loadSession error', e); }
@@ -136,6 +197,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const { card, name } = e.detail || {};
         if (!card) return;
         state.file.uploaded = card;
+        state.file.pngFile = null; // las cartas de la boveda no conservan la imagen
         resetCardState();
         extractFields(card);
         const count = Object.keys(getExtracted()).length;
@@ -143,6 +205,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (rawCount) rawCount.textContent = count;
         renderRaw();
         if (processBtn) processBtn.disabled = !hasCardContent(count);
+        refreshProcessHint();
         setWorkspaceLoaded(true, name || 'Carta de la boveda', count);
         updLorebookCount();
         if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
@@ -173,8 +236,8 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Config inputs mark dirty + update labels
     charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); });
-    userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); });
-    sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; refreshVisibleJSON(); });
+    userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); refreshProcessHint(); });
+    sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; refreshVisibleJSON(); refreshProcessHint(); });
     userPersonaInput?.addEventListener('input', () => { state.vault.dirty = true; });
 
     /* ── File handling ── */
@@ -197,9 +260,13 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (isJson) {
                 const text = await file.text();
                 try { state.file.uploaded = JSON.parse(text); } catch { return setStatus('JSON malformado.', 'error'); }
+                state.file.pngFile = null;
                 finishLoad(file.name);
             } else {
-                state.file.uploaded = await extPNG(file);
+                const parsed = await extPNG(file);
+                state.file.uploaded = parsed;
+                // Se guarda el File para reexportar a PNG sin reseleccionarlo.
+                state.file.pngFile = file;
                 finishLoad(file.name);
             }
         } catch (err) { console.error(err); setStatus('Error: ' + (err.message || 'Sin metadatos.'), 'error'); }
@@ -212,11 +279,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const hasContent = hasCardContent(count);
         if (!hasContent) {
             processBtn.disabled = true;
+            refreshProcessHint();
             if (rawCount) rawCount.textContent = '0';
             const pc = $('processedCount'); if (pc) pc.textContent = '0';
-            const rv = $('rawView'); if (rv) rv.replaceChildren();
+            const rv = $('rawView'); if (rv) rv.replaceChildren(emptyFieldsState('<i class="fa-solid fa-scroll"></i>', 'La plantilla no tiene campos.', ''));
             const pv = $('processedView');
-            if (pv) pv.innerHTML = '<p class="text-text3 italic text-center py-12">No se encontraron campos compatibles.</p>';
+            if (pv) pv.replaceChildren(emptyFieldsState('<i class="fa-solid fa-triangle-exclamation"></i>', 'No se encontraron campos compatibles.', 'El archivo se leyo, pero no contiene campos de CharaCard v2.'));
             setWorkspaceLoaded(true, fn, count);
             updLorebookCount();
             $('tabRaw')?.click();
@@ -233,6 +301,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (rawCount) rawCount.textContent = count;
         renderRaw();
         if (processBtn) processBtn.disabled = !hasContent;
+        refreshProcessHint();
         setWorkspaceLoaded(true, fn, count);
         updLorebookCount();
         if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
@@ -254,9 +323,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     processBtn?.addEventListener('click', processText);
 
     clearBtn?.addEventListener('click', async () => {
+        const hasWork = Boolean(state.file.uploaded) || Object.keys(state.proc.data).length > 0 || state.characterBook.present;
+        if (!hasWork) { showToast('No hay nada que limpiar', 'info'); return; }
+
+        const res = await confirmDialog({
+            title: 'Limpiar todo',
+            message: 'Se borraran la carta cargada, las ediciones y el lorebook de esta sesion.\n\nPodras recuperarlo desde el aviso.',
+            okLabel: 'Limpiar',
+            danger: 'ok',
+            icon: 'fa-broom'
+        });
+        if (res !== 'ok') return;
+
+        // Snapshot ANTES de destruir nada: alimenta el "Deshacer" del toast.
+        const snap = snapState();
+
         closeExp(); closeAddF(); closeExpModal(); rstDel();
         if (fileInput) fileInput.value = '';
-        state.file.uploaded = null; state.file.extracted = {};
+        state.file.uploaded = null; state.file.extracted = {}; state.file.pngFile = null;
         state.proc.data = {}; state.proc.edited.clear();
         state.editor.active = false; state.editor.added.clear(); state.editor.removed.clear();
         state.jsonEditor.snap = null; state.jsonEditor.dirty = false; state.jsonEditor.err = null;
@@ -270,6 +354,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (charNameInput) charNameInput.value = '';
         updLP();
         if (processBtn) processBtn.disabled = true;
+        refreshProcessHint();
         const pc = $('processedCount'); if (pc) pc.textContent = '0';
         if (rawCount) rawCount.textContent = '0';
         const rv = $('rawView'); if (rv) rv.innerHTML = '';
@@ -283,7 +368,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         updLorebookCount();
         setWorkspaceLoaded(false);
         setActiveTab('tabProcessed');
-        showToast('Tomo purificado');
+        showToast('Tomo purificado', 'success', {
+            label: 'Deshacer',
+            onClick: async () => {
+                await hydrateFrom(snap);
+                state.vault.dirty = true;
+                showToast('Trabajo restaurado');
+            }
+        });
         if (dbReady) { try { await vault.clearSession(); } catch {} }
     });
 
@@ -325,6 +417,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'Enter') { e.preventDefault(); const jv = $('jsonView'); const jab = $('jsonApplyBtn'); if (jv && !jv.classList.contains('hidden') && jab && !jab.disabled) jab.click(); }
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'e') { if (!isInput) { e.preventDefault(); togEd(); } }
         if (e.key === 'Escape') {
+            if (closeConfirmDialog('cancel')) return;
+            if (closeShortcuts()) return;
             const about = $('aboutModal'), exp = $('expandModal'), add = $('addFieldModal'), expM = $('exportModal'), vaultM = $('vaultModal');
             if (vaultM && !vaultM.classList.contains('hidden')) { vaultM.classList.add('hidden'); vaultM.classList.remove('flex'); }
             else if (about && !about.classList.contains('hidden')) { about.classList.add('hidden'); about.classList.remove('flex'); }

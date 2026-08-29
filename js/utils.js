@@ -136,27 +136,159 @@ export const TOAST_STYLES = {
     info:    { icon: 'fa-circle-info', cls: 'text-user', bd: 'border-border2' }
 };
 
+/* ─── Toasts ───
+   Con cola FIFO: antes un solo nodo se sobrescribia y los avisos rapidos se
+   pisaban entre si. Ahora se encolan y cada uno conserva su propia accion. */
+const MAX_TOASTS = 4;
+const toastQueue = [];
 let toastTm = null;
-export function showToast(msg, type = 'success') {
+let toastActive = false;
+let toastActionFn = null;
+
+function dismissToast() {
+    const t = $('toast');
+    if (!t) return;
+    t.style.opacity = '0';
+    t.style.transform = 'translate(-50%,1rem)';
+    const btn = $('toastAction');
+    if (btn) { btn.classList.add('hidden'); btn.onclick = null; }
+    toastActionFn = null;
+}
+
+function paintToast({ msg, type, action }) {
     const s = TOAST_STYLES[type] || TOAST_STYLES.success;
     const t = $('toast');
     const icon = $('toastIcon');
     const msgEl = $('toastMsg');
-    if (!t || !icon || !msgEl) {
-        console.log(`[Toast ${type}] ${msg}`);
-        return;
-    }
+    if (!t || !icon || !msgEl) return;
+
     icon.className = 'fa-solid ' + s.icon + ' ' + s.cls;
     for (const st of Object.values(TOAST_STYLES)) t.classList.remove(st.bd);
     t.classList.add(s.bd);
     msgEl.textContent = msg;
+
+    const btn = $('toastAction');
+    if (btn) {
+        toastActionFn = action?.onClick || null;
+        if (action?.label && typeof toastActionFn === 'function') {
+            btn.textContent = action.label;
+            btn.onclick = () => {
+                const fn = toastActionFn;
+                if (toastTm) { clearTimeout(toastTm); toastTm = null; }
+                dismissToast();
+                toastActive = false;
+                try { fn(); } catch (err) { console.error('[Toast action]', err); }
+                pumpToast();
+            };
+            btn.classList.remove('hidden');
+        } else {
+            btn.classList.add('hidden');
+            btn.onclick = null;
+        }
+    }
+
     t.style.opacity = '1';
     t.style.transform = 'translate(-50%,0)';
+}
+
+function pumpToast() {
+    if (toastActive) return;
+    const next = toastQueue.shift();
+    if (!next) return;
+    toastActive = true;
+    paintToast(next);
     if (toastTm) clearTimeout(toastTm);
+    // Con accion disponible se deja mas tiempo para reaccionar.
     toastTm = setTimeout(() => {
-        t.style.opacity = '0';
-        t.style.transform = 'translate(-50%,1rem)';
-    }, 3000);
+        dismissToast();
+        toastActive = false;
+        pumpToast();
+    }, next.action ? 9000 : 3000);
+}
+
+/**
+ * @param {object} [action] Opcional. { label: string, onClick: Function }
+ *                 Muestra un boton dentro del toast (p. ej. "Deshacer").
+ *                 Al pulsarlo se oculta el toast y se ejecuta onClick.
+ */
+export function showToast(msg, type = 'success', action = null) {
+    const t = $('toast');
+    if (!t || !$('toastIcon') || !$('toastMsg')) {
+        console.log(`[Toast ${type}] ${msg}`);
+        return;
+    }
+    toastQueue.push({ msg, type, action });
+    // Si se disparan muchos de golpe, se descartan los mas viejos.
+    if (toastQueue.length > MAX_TOASTS) toastQueue.splice(0, toastQueue.length - MAX_TOASTS);
+    pumpToast();
+}
+
+/* ─── Confirm dialog ───
+   Reemplaza los dialogos nativos del navegador por un modal con el estilo de la app.
+   Vive aqui (junto a showToast) para que cualquier modulo pueda usarlo sin
+   importar ui.js, lo que crearia un ciclo de modulos. */
+
+const OK_BASE = 'font-cinzel text-[0.65rem] tracking-wider uppercase rounded-lg px-5 py-2 transition-all ';
+const OK_NORMAL = 'text-bg bg-gold hover:brightness-110';
+const OK_DANGER = 'text-white bg-[#8c2f2f] hover:brightness-110';
+const CANCEL_BASE = 'font-cinzel text-[0.65rem] tracking-wider uppercase rounded-lg px-4 py-2 transition-all ';
+const CANCEL_NORMAL = 'text-text3 hover:text-text1 border border-border1 hover:border-border2';
+const CANCEL_DANGER = 'text-[#e05a5a] border border-[#502020] hover:bg-[#3a1a1a]';
+
+let confirmResolve = null;
+
+/**
+ * @returns {Promise<'ok'|'cancel'|'extra'>}
+ * @param {string} [opts.danger] 'ok' | 'cancel' — cual de los dos botones se pinta como destructivo.
+ * @param {string} [opts.extraLabel] Si se indica, anade un tercer boton que resuelve 'extra'.
+ */
+export function confirmDialog({
+    title = 'Confirmar',
+    message = '',
+    okLabel = 'Aceptar',
+    cancelLabel = 'Cancelar',
+    extraLabel = '',
+    icon = 'fa-circle-question',
+    danger = null
+} = {}) {
+    return new Promise((resolve) => {
+        const modal = $('confirmModal');
+        if (!modal) { resolve(window.confirm(message) ? 'ok' : 'cancel'); return; }
+        confirmResolve = resolve;
+
+        $('confirmTitle').textContent = title;
+        $('confirmMessage').textContent = message;
+        $('confirmIcon').className = 'fa-solid ' + icon + ' text-sm ' + (danger === 'cancel' ? 'text-[#e05a5a]' : 'text-gold');
+
+        const ok = $('confirmOkBtn');
+        ok.textContent = okLabel;
+        ok.className = OK_BASE + (danger === 'ok' ? OK_DANGER : OK_NORMAL);
+
+        const cancel = $('confirmCancelBtn');
+        cancel.textContent = cancelLabel || 'Cancelar';
+        cancel.className = CANCEL_BASE + (danger === 'cancel' ? CANCEL_DANGER : CANCEL_NORMAL);
+        cancel.classList.toggle('hidden', !cancelLabel);
+
+        const extra = $('confirmExtraBtn');
+        extra.textContent = extraLabel || '';
+        extra.classList.toggle('hidden', !extraLabel);
+
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        (extraLabel ? extra : ok).focus();
+    });
+}
+
+/** Cierra el dialogo resolviendo la promesa. Devuelve false si no estaba abierto. */
+export function closeConfirmDialog(result) {
+    const modal = $('confirmModal');
+    if (!modal || modal.classList.contains('hidden')) return false;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    const resolve = confirmResolve;
+    confirmResolve = null;
+    if (resolve) resolve(result);
+    return true;
 }
 
 export function trapFocus(e, el) {

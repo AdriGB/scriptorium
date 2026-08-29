@@ -27,6 +27,7 @@
         .dropzone-anim::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background:conic-gradient(from 0deg,transparent 0deg,rgba(201,168,76,0.05) 90deg,transparent 180deg);animation:spin 12s linear infinite;opacity:0;transition:opacity 0.4s;pointer-events:none}
         .dropzone-anim:hover::before,.dropzone-anim.drag-over::before{opacity:1}
         .dropzone-anim.drag-over{border-color:#e8cc80;background-color:rgba(201,168,76,0.08);transform:scale(1.01)}
+        mark.search-hit{background:rgba(201,168,76,0.28);color:#f0e2b8;border-radius:2px;padding:0 1px}
         .tag-char{background:rgba(58,41,10,0.3);color:#e8b860;border:1px solid #7a6230;border-radius:4px;padding:0 4px;font-size:0.85em;font-style:normal}
         .tag-user{background:rgba(26,38,68,0.3);color:#7ea8e8;border:1px solid #363a6a;border-radius:4px;padding:0 4px;font-size:0.85em;font-style:normal}
         .field-card-body{max-height:none;transition:max-height 0.35s ease-in-out,padding 0.3s,opacity 0.3s;opacity:1}
@@ -97,6 +98,7 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
+            <button id="shortcutsBtn" type="button" title="Atajos de teclado (?)" aria-label="Atajos de teclado" class="text-xs text-text3 hover:text-gold px-2.5 py-2 rounded-lg transition-colors"><i class="fa-solid fa-keyboard"></i><span class="hidden lg:inline ml-1">Atajos</span></button>
             <button id="aboutBtn" type="button" title="Acerca de Scriptorium" class="text-xs text-text3 hover:text-gold px-2.5 py-2 rounded-lg transition-colors"><i class="fa-solid fa-circle-info mr-1"></i><span class="hidden sm:inline">Acerca de</span></button>
             <button id="vaultBtn" type="button" title="Abrir boveda de personajes" class="text-xs text-text2 hover:text-gold border border-border1 hover:border-goldDim rounded-lg px-3 py-2 transition-all"><i class="fa-solid fa-box-archive mr-1"></i> Boveda</button>
             <button id="installBtn" type="button" class="hidden text-xs text-bg bg-gold hover:brightness-110 rounded-lg px-3 py-2 transition-all"><i class="fa-solid fa-download mr-1"></i> Instalar</button>
@@ -140,6 +142,7 @@
             <section class="order-5 pb-6">
                 <button id="processBtn" disabled class="w-full bg-gradient-to-br from-[#2a1f00] to-[#1c1600] border border-goldDim text-gold hover:text-gold2 hover:border-gold2 hover:shadow-[0_0_20px_rgba(201,168,76,0.2)] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all rounded-lg py-3 font-cinzel text-xs tracking-wider uppercase flex items-center justify-center gap-2 relative overflow-hidden group"><div class="absolute inset-0 bg-gradient-to-br from-gold to-[#f0d070] opacity-0 group-hover:opacity-10 transition-opacity"></div><i class="fa-solid fa-bolt text-sm z-10"></i><span class="z-10 font-bold">Invocar y Sustituir</span></button>
                 <div class="text-center text-[0.65rem] text-text3 font-cinzel tracking-widest mt-2">Atajo: <kbd class="bg-surface2 border border-border2 rounded px-1 font-mono text-[0.6rem]">Ctrl</kbd> + <kbd class="bg-surface2 border border-border2 rounded px-1 font-mono text-[0.6rem]">&#8629;</kbd></div>
+                <p id="processHint" class="hidden text-center text-[0.68rem] text-text3 font-crimson italic mt-2 leading-snug"></p>
                 <button id="clearBtn" class="w-full mt-4 bg-transparent border border-border1 text-text3 hover:text-text2 hover:border-border2 hover:bg-surface2 active:scale-[0.98] transition-all rounded-lg py-2 font-cinzel text-[0.65rem] tracking-[0.12em] uppercase flex items-center justify-center gap-2"><i class="fa-solid fa-broom"></i> Limpiar Todo</button>
             </section>
             <div class="order-6 text-[0.7rem] text-text3/60 font-crimson italic text-center px-2 pb-2 leading-snug"><i class="fa-solid fa-lock mr-1"></i> Los archivos se procesan localmente. La traduccion envia texto a Google Translate.</div>
@@ -152,7 +155,7 @@
                 <button id="tabLorebook" role="tab" aria-selected="false" class="tab-btn px-4 py-3.5 font-cinzel text-[0.65rem] tracking-[0.15em] uppercase text-text3 border-b-2 border-transparent hover:text-text2 transition-colors flex items-center gap-2 whitespace-nowrap"><i class="fa-solid fa-book-atlas"></i> Lorebook <span id="lorebookCount" class="bg-[#1a2a20] text-editor text-[0.6rem] px-1.5 py-0.5 rounded-full font-crimson italic tracking-normal">0</span></button>
                 <div class="ml-2 flex items-center border-l border-border1 pl-3"><button id="editorToggle" type="button" class="editor-toggle-btn flex items-center gap-2 px-3 py-1.5 rounded-full border border-border1 bg-surface2 text-text3 hover:text-text1 hover:border-border2 transition-all" title="Modo editor (Ctrl+E)" aria-pressed="false"><i class="fa-solid fa-pen-ruler text-[0.65rem]"></i><span class="font-cinzel text-[0.58rem] tracking-[0.12em] uppercase hidden md:inline">Editor</span><span class="w-6 h-3.5 rounded-full bg-bg border border-border1 relative inline-flex items-center"><span class="toggle-dot w-2.5 h-2.5 rounded-full bg-text3 transition-all duration-300 ml-0.5"></span></span></button></div>
                 <div class="flex-1"></div>
-                <div id="searchContainer" class="flex items-center gap-2 bg-surface2 border border-border1 rounded-full px-3 py-1.5 my-2 focus-within:border-gold/50 transition-colors"><i class="fa-solid fa-magnifying-glass text-text3 text-xs"></i><label for="searchInput" class="sr-only">Buscar</label><input type="text" id="searchInput" placeholder="Buscar..." class="bg-transparent border-none outline-none text-text1 font-crimson text-sm w-20 md:w-24 placeholder:text-text3 placeholder:italic"><button id="searchClearBtn" type="button" class="hidden text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-circle-xmark text-xs"></i></button></div>
+                <div id="searchContainer" class="flex items-center gap-2 bg-surface2 border border-border1 rounded-full px-3 py-1.5 my-2 focus-within:border-gold/50 transition-colors"><i class="fa-solid fa-magnifying-glass text-text3 text-xs"></i><label for="searchInput" class="sr-only">Buscar</label><input type="text" id="searchInput" placeholder="Buscar..." class="bg-transparent border-none outline-none text-text1 font-crimson text-sm w-20 md:w-24 placeholder:text-text3 placeholder:italic"><span id="searchCount" class="hidden text-[0.6rem] text-text3 font-crimson italic whitespace-nowrap"></span><button id="searchClearBtn" type="button" class="hidden text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-circle-xmark text-xs"></i></button></div>
             </div>
             <div id="workspaceStatusBar" class="hidden flex px-4 md:px-6 py-2 border-b border-border1 bg-bg2/80 text-[0.7rem] text-text3 items-center gap-x-4 gap-y-1 flex-wrap shrink-0">
                 <button id="vaultStatus" class="hover:text-gold transition-colors" title="Abrir boveda"><i class="fa-solid fa-circle text-editor text-[0.45rem] mr-1"></i><span id="vaultStatusText">Guardado localmente</span></button>
@@ -162,7 +165,22 @@
             </div>
             <div id="editorInfoBar" class="editor-bar hidden px-4 md:px-8 py-2 items-center gap-2 text-[0.7rem] text-editor font-cinzel tracking-wide shrink-0"><i class="fa-solid fa-pen-ruler"></i><span>Modo editor</span><div class="flex-1"></div><span class="text-text3 font-crimson italic tracking-normal">Ctrl+E para salir</span></div>
             <div id="resultsArea" class="flex-1 overflow-y-auto scrollbar-custom p-4 md:p-8 relative">
-                <div id="workspaceEmpty" class="flex h-full min-h-[55vh] items-center justify-center">
+                <div id="workspaceEmpty" class="flex flex-col h-full min-h-[55vh] items-center justify-center gap-6 px-4">
+                    <div id="welcomePanel" class="hidden w-full max-w-xl rounded-2xl border border-border1 bg-surface/60 px-6 py-5">
+                        <div class="flex items-start gap-3">
+                            <i class="fa-solid fa-compass text-goldDim text-base mt-0.5 shrink-0"></i>
+                            <div class="flex-1 min-w-0">
+                                <h3 class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase text-gold mb-2">Como funciona</h3>
+                                <ol class="font-crimson text-sm text-text2 leading-relaxed space-y-1.5 list-decimal list-inside">
+                                    <li>Carga un <strong class="text-text1">JSON</strong> o un <strong class="text-text1">PNG</strong> con metadatos CharaCardV2.</li>
+                                    <li>Escribe el nombre del personaje y el tuyo en el panel izquierdo.</li>
+                                    <li>Pulsa <strong class="text-text1">Invocar y Sustituir</strong> para reemplazar <span class="tag-char">{{char}}</span> y <span class="tag-user">{{user}}</span>.</li>
+                                </ol>
+                                <p class="font-crimson text-xs text-text3/80 italic mt-3"><i class="fa-solid fa-lock mr-1"></i>Nada sale de este dispositivo.</p>
+                            </div>
+                            <button id="welcomeDismiss" type="button" title="No mostrar de nuevo" aria-label="No mostrar de nuevo" class="text-text3 hover:text-text1 transition-colors shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                        </div>
+                    </div>
                     <div id="centerDropzone" class="dropzone-anim relative w-full max-w-xl overflow-hidden rounded-2xl border-2 border-dashed border-border2 bg-surface/60 px-8 py-12 text-center transition-all">
                         <div class="relative z-10"><i class="fa-solid fa-file-arrow-up text-4xl text-goldDim mb-5"></i><h2 class="font-cinzel text-lg text-gold2 mb-2">Arrastra una carta aqui</h2><p class="text-text3 mb-6">JSON o PNG con metadatos · maximo 10 MB</p><div class="flex flex-col sm:flex-row items-center justify-center gap-3"><label for="dropzone-file" class="cursor-pointer rounded-lg bg-gold px-5 py-2.5 text-sm font-semibold text-bg hover:brightness-110 transition-all"><i class="fa-solid fa-folder-open mr-2"></i>Seleccionar archivo</label><button id="emptyVaultBtn" type="button" class="rounded-lg border border-border1 px-5 py-2.5 text-sm text-text2 hover:border-goldDim hover:text-gold transition-all"><i class="fa-solid fa-box-archive mr-2"></i>Abrir desde la boveda</button></div><p class="mt-5 text-xs text-text3/70"><i class="fa-solid fa-lock mr-1"></i>El procesamiento se realiza en este dispositivo.</p></div>
                     </div>
@@ -189,7 +207,7 @@
             </div>
         </section>
     </main>
-    <div id="toast" role="status" aria-live="polite" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#1a1c2e] border border-border2 text-text1 px-5 py-2.5 rounded-full font-crimson italic text-sm flex items-center gap-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.6)] opacity-0 translate-y-4 pointer-events-none transition-all duration-300 z-50"><i id="toastIcon" class="fa-solid fa-circle-check text-gold"></i><span id="toastMsg"></span></div>
+    <div id="toast" role="status" aria-live="polite" class="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#1a1c2e] border border-border2 text-text1 px-5 py-2.5 rounded-full font-crimson italic text-sm flex items-center gap-2.5 shadow-[0_8px_30px_rgba(0,0,0,0.6)] opacity-0 translate-y-4 pointer-events-none transition-all duration-300 z-50"><i id="toastIcon" class="fa-solid fa-circle-check text-gold"></i><span id="toastMsg"></span><button id="toastAction" type="button" class="hidden shrink-0 font-cinzel text-[0.6rem] tracking-[0.12em] uppercase text-gold border border-goldDim/60 hover:bg-goldDim/15 rounded-full px-3 py-1 transition-colors"></button></div>
     <!-- About Modal -->
     <div id="aboutModal" role="dialog" aria-modal="true" class="fixed inset-0 z-[65] hidden items-center justify-center p-4">
         <div id="aboutBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
@@ -240,6 +258,43 @@
                 <button id="exportCopyJson" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 hover:text-text1 border border-border1 hover:border-border2 rounded-lg px-4 py-2 transition-all"><i class="fa-regular fa-copy"></i> Copiar</button>
                 <button id="exportDownload" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-bg bg-editor hover:brightness-110 rounded-lg px-5 py-2 transition-all"><i class="fa-solid fa-download"></i> JSON</button>
                 <button id="exportDownloadPng" disabled class="font-cinzel text-[0.65rem] tracking-wider uppercase text-bg bg-gold hover:brightness-110 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg px-5 py-2 transition-all"><i class="fa-solid fa-download"></i> PNG</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shortcuts Modal -->
+    <div id="shortcutsModal" role="dialog" aria-modal="true" aria-labelledby="shortcutsTitle" class="fixed inset-0 z-[70] hidden items-center justify-center p-4">
+        <div id="shortcutsBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative bg-surface border border-border2 rounded-xl w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-fade-in-up">
+            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-border1 bg-gradient-to-r from-[#1b1733] to-[#121024] rounded-t-xl">
+                <i class="fa-solid fa-keyboard text-gold text-sm"></i>
+                <h3 id="shortcutsTitle" class="font-cinzel text-sm tracking-wide text-gold flex-1">Atajos de teclado</h3>
+                <button id="shortcutsClose" type="button" title="Cerrar" aria-label="Cerrar" class="text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <ul class="p-5 space-y-2.5 font-crimson text-sm text-text2">
+                <li class="flex items-center justify-between gap-4"><span>Procesar y sustituir</span><span class="shrink-0"><kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Ctrl</kbd> <span class="text-text3">+</span> <kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Enter</kbd></span></li>
+                <li class="flex items-center justify-between gap-4"><span>Alternar modo editor</span><span class="shrink-0"><kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Ctrl</kbd> <span class="text-text3">+</span> <kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">E</kbd></span></li>
+                <li class="flex items-center justify-between gap-4"><span>Aplicar cambios del JSON</span><span class="shrink-0"><kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Ctrl</kbd> <span class="text-text3">+</span> <kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Shift</kbd> <span class="text-text3">+</span> <kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Enter</kbd></span></li>
+                <li class="flex items-center justify-between gap-4"><span>Cerrar el panel activo</span><span class="shrink-0"><kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">Esc</kbd></span></li>
+                <li class="flex items-center justify-between gap-4"><span>Ver esta ayuda</span><span class="shrink-0"><kbd class="bg-surface2 border border-border2 rounded px-1.5 py-0.5 font-mono text-[0.65rem]">?</kbd></span></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Confirm Modal (reemplaza los confirm() nativos) -->
+    <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" class="fixed inset-0 z-[70] hidden items-center justify-center p-4">
+        <div id="confirmBackdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+        <div class="relative bg-surface border border-border2 rounded-xl w-full max-w-md shadow-[0_20px_60px_rgba(0,0,0,0.6)] animate-fade-in-up">
+            <div class="flex items-center gap-3 px-5 py-3.5 border-b border-border1 bg-gradient-to-r from-[#1b1733] to-[#121024] rounded-t-xl">
+                <i id="confirmIcon" class="fa-solid fa-circle-question text-gold text-sm"></i>
+                <h3 id="confirmTitle" class="font-cinzel text-sm tracking-wide text-gold flex-1"></h3>
+                <button id="confirmClose" type="button" title="Cancelar" aria-label="Cancelar" class="text-text3 hover:text-text1 transition-colors"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <div class="px-5 py-4"><p id="confirmMessage" class="font-crimson text-sm text-text1 whitespace-pre-line leading-relaxed"></p></div>
+            <div class="flex items-center justify-end gap-2 px-5 py-3.5 border-t border-border1 flex-wrap">
+                <button id="confirmExtraBtn" type="button" class="hidden font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 hover:text-text1 border border-border1 hover:border-border2 rounded-lg px-4 py-2 transition-all"></button>
+                <button id="confirmCancelBtn" type="button" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-text3 hover:text-text1 border border-border1 hover:border-border2 rounded-lg px-4 py-2 transition-all">Cancelar</button>
+                <button id="confirmOkBtn" type="button" class="font-cinzel text-[0.65rem] tracking-wider uppercase text-bg bg-gold hover:brightness-110 rounded-lg px-5 py-2 transition-all">Aceptar</button>
             </div>
         </div>
     </div>

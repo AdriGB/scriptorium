@@ -1,5 +1,5 @@
 import state, { VF, getExtracted, RESERVED_KEYS } from './state.js';
-import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey } from './utils.js';
+import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog } from './utils.js';
 import { extractFields, buildExp, findCardByKey } from './chara-card.js';
 import { trText, checkTranslationPrivacy } from './translator.js';
 
@@ -103,7 +103,12 @@ export function createCard(key, text, isRaw) {
 
     const cc = document.createElement('span'); cc.className = 'text-[0.65rem] text-text3 font-crimson italic'; cc.textContent = text.length + ' chars';
     const tg = document.createElement('i'); tg.className = 'fa-solid fa-chevron-down text-text3 text-[0.7rem] transition-transform duration-300';
-    head.append(tEl, cc, tg);
+    // Badge "editado": state.proc.edited ya se rastreaba en 11 sitios, pero nunca se mostraba.
+    const ed = document.createElement('span');
+    ed.className = 'edited-badge hidden shrink-0 text-[0.55rem] px-1.5 py-0.5 rounded font-crimson italic bg-editor/20 text-editor border border-editor/30';
+    ed.textContent = 'editado';
+    ed.title = 'Modificado manualmente';
+    head.append(tEl, cc, ed, tg);
 
     const body = document.createElement('div'); body.className = 'field-card-body px-5 py-4'; body.style.overflow = 'hidden';
 
@@ -137,6 +142,7 @@ export function createCard(key, text, isRaw) {
         state.proc.data[key] = e.target.innerText;
         cc.textContent = e.target.innerText.length + ' chars';
         state.proc.edited.add(key);
+        ed.classList.remove('hidden');
         state.vault.dirty = true;
         tC = null; tB.classList.add('hidden');
         if (tA) { tA.abort(); tA = null; }
@@ -189,6 +195,7 @@ export function createCard(key, text, isRaw) {
                 const cn = charNameInput().value.trim() || '{{char}}', un = userNameInput().value.trim() || '{{user}}';
                 const res = (o || '').replace(/\{\{char\}\}/gi, () => cn).replace(/\{\{user\}\}/gi, () => un);
                 ce.textContent = res; state.proc.data[key] = res; state.proc.edited.delete(key);
+                ed.classList.add('hidden');
                 cc.textContent = res.length + ' chars'; tC = null; tB.classList.add('hidden');
                 state.vault.dirty = true;
                 if (tA) { tA.abort(); tA = null; }
@@ -205,10 +212,44 @@ export function createCard(key, text, isRaw) {
 }
 
 /* ─── Render ─── */
+/* Refleja state.proc.edited en las tarjetas ya pintadas. */
+export function refreshEditedBadges() {
+    processedView().querySelectorAll('.field-card').forEach(card => {
+        const badge = card.querySelector('.edited-badge');
+        if (!badge) return;
+        badge.classList.toggle('hidden', !card.dataset.key || !state.proc.edited.has(card.dataset.key));
+    });
+}
+
+/* ─── Empty states ───
+   Avisa al modulo de busqueda (ui.js) de que el arbol se ha repintado, para que
+   reaplique el filtro. Se hace por evento para no crear el ciclo editor <-> ui. */
+function announceRender() {
+    document.dispatchEvent(new CustomEvent('fields:rendered'));
+}
+
+export function emptyFieldsState(glyphHtml, title, hint) {
+    // glyphHtml va tal cual (es marcado); el texto se escapa por si alguna vez
+    // llega de la propia carta en lugar de ser un literal.
+    const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+    const box = document.createElement('div');
+    box.className = 'fields-empty-state flex flex-col items-center justify-center min-h-[40vh] text-center px-4 py-10';
+    box.innerHTML =
+        '<div class="mb-4 text-text3 opacity-20 ' + (glyphHtml.startsWith('&#') ? 'text-5xl font-cinzelDeco' : 'text-3xl') + '">' + glyphHtml + '</div>' +
+        '<p class="text-text3 italic max-w-sm text-sm">' + esc(title) + '</p>' +
+        (hint ? '<p class="text-text3/60 text-xs mt-2">' + esc(hint) + '</p>' : '');
+    return box;
+}
+
 export function renderRaw() {
     const rv = rawView();
     rv.innerHTML = '<p class="text-[0.78rem] text-text3 italic mb-4 px-1">Plantilla: <span class="tag-char">{{char}}</span> y <span class="tag-user">{{user}}</span></p>';
-    Object.entries(getExtracted()).forEach(([k, v]) => rv.appendChild(createCard(k, v, true)));
+    const entries = Object.entries(getExtracted());
+    if (entries.length) entries.forEach(([k, v]) => rv.appendChild(createCard(k, v, true)));
+    // Antes la pestana quedaba en blanco salvo el pie de plantilla: sin carta no
+    // se explicaba por que no habia nada.
+    else rv.appendChild(emptyFieldsState('<i class="fa-solid fa-scroll"></i>', 'La plantilla no tiene campos.', 'Carga una carta para ver aqui sus campos originales.'));
+    announceRender();
 }
 
 export function renderProc() {
@@ -217,8 +258,8 @@ export function renderProc() {
     const pv = processedView();
     pv.innerHTML = '';
     if (entries.length === 0 && !state.editor.active) {
-        pv.innerHTML = '<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 font-cinzelDeco text-text3 mb-4">&#5765;</div><p class="text-text3 italic max-w-sm text-sm">Las paginas aguardan.</p></div>';
-        updFab(); updLorebookCount(); return;
+        pv.appendChild(emptyFieldsState('&#5765;', 'Las paginas aguardan.', 'Procesa la carta para ver aqui el resultado.'));
+        updFab(); updLorebookCount(); announceRender(); return;
     }
     const h = document.createElement('p');
     h.className = 'text-[0.72rem] text-text3 italic mb-4 px-1 flex items-center gap-2';
@@ -227,6 +268,7 @@ export function renderProc() {
         : '<i class="fa-solid fa-pen-to-square"></i> Clica para editar.';
     pv.appendChild(h);
     entries.forEach(([k, v], i) => { const c = createCard(k, v, false); c.style.animationDelay = i * 0.05 + 's'; pv.appendChild(c); });
+    refreshEditedBadges();
     if (state.editor.active) {
         decorateEd();
         const ab = document.createElement('button');
@@ -240,6 +282,7 @@ export function renderProc() {
     if (state.altGreetings.list.length > 0) decorateAltGreetings();
     updFab();
     updLorebookCount();
+    announceRender();
 }
 
 /* ─── Editor decorations ─── */
@@ -558,12 +601,21 @@ function countObjFieldsLocal(o) {
     return c;
 }
 
-export function applyJE() {
+export async function applyJE() {
     try {
         const parsed = JSON.parse($('jsonEditorTextarea').value);
         if (Object.keys(state.proc.data).length > 0) {
             const hasEdits = state.proc.edited.size > 0 || state.editor.added.size > 0;
-            if (hasEdits) { if (!confirm('Hay ediciones visuales activas.\n\nAplicar el JSON reemplazara todo el estado actual.\nContinuar?')) return; }
+            if (hasEdits) {
+                const res = await confirmDialog({
+                    title: 'Aplicar JSON',
+                    message: 'Hay ediciones visuales activas.\n\nAplicar el JSON reemplazara todo el estado actual.',
+                    okLabel: 'Aplicar',
+                    danger: 'ok',
+                    icon: 'fa-triangle-exclamation'
+                });
+                if (res !== 'ok') return;
+            }
         }
         state.file.uploaded = parsed;
         resetCardState();
@@ -810,8 +862,15 @@ export function renderLorebook() {
 
         if (state.editor.active) {
             const delBtn = mkB('<i class="fa-solid fa-trash-can"></i>', 'Eliminar', 'hover:text-[#e05a5a] hover:border-[#502020]');
-            delBtn.addEventListener('click', () => {
-                if (!confirm('Eliminar entrada "' + (entry.keys.join(', ') || '(sin claves)') + '"?')) return;
+            delBtn.addEventListener('click', async () => {
+                const res = await confirmDialog({
+                    title: 'Eliminar entrada',
+                    message: 'Se eliminara "' + (entry.keys.join(', ') || '(sin claves)') + '" del lorebook.',
+                    okLabel: 'Eliminar',
+                    danger: 'ok',
+                    icon: 'fa-trash-can'
+                });
+                if (res !== 'ok') return;
                 state.characterBook.entries.splice(i, 1);
                 state.vault.dirty = true;
                 renderLorebook();
@@ -850,4 +909,5 @@ export function renderLorebook() {
     }
 
     updLorebookCount();
+    announceRender();
 }
