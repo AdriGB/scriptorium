@@ -62,13 +62,35 @@ let rail = null, track = null, viewport = null, tip = null, scroller = null, wra
 let entries = [];
 let reduced = false;
 let rafScroll = 0, rafBuild = 0;
+let hideTimer = 0;
 
-function hideTip() { if (tip) tip.classList.remove('is-visible'); }
+/* La etiqueta se cierra con un pequeno retardo para que el cursor pueda pasar
+   de la marca a la propia etiqueta sin que se esfume: son dos elementos
+   separados y, sin el retardo, el mouseleave de la marca gana la carrera. */
+function scheduleHide() {
+    if (hideTimer) clearTimeout(hideTimer);
+    hideTimer = setTimeout(() => { tip.classList.remove('is-visible'); hideTimer = 0; }, 160);
+}
 
 function showTip(btn) {
     const e = entries[Number(btn.dataset.index)];
     if (!e || !tip) return;
-    tip.textContent = e.label;
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; }
+    // Etiqueta a dos lineas: nombre del campo y un trozito de su contenido.
+    // Asi, aunque la marca sea pequena, el blanco de clic efectivo pasa a ser
+    // todo el cuadro de la etiqueta, que es mucho mas facil de acertar.
+    tip.replaceChildren();
+    const label = document.createElement('div');
+    label.className = 'fi-tip-label';
+    label.textContent = e.label;
+    tip.appendChild(label);
+    if (e.snippet) {
+        const sn = document.createElement('div');
+        sn.className = 'fi-tip-snippet';
+        sn.textContent = e.snippet;
+        tip.appendChild(sn);
+    }
+    tip.dataset.index = btn.dataset.index;
     tip.style.top = Math.max(0, btn.offsetTop + btn.offsetHeight / 2 - tip.offsetHeight / 2) + 'px';
     tip.classList.add('is-visible');
 }
@@ -76,7 +98,7 @@ function showTip(btn) {
 function setVisible(v) {
     if (!rail || rail.hidden) return;
     rail.classList.toggle('is-visible', v);
-    if (!v) hideTip();
+    if (!v) scheduleHide();
 }
 
 function jumpTo(i) {
@@ -92,9 +114,9 @@ function createTick() {
     b.className = 'fi-tick';
     b.addEventListener('click', () => jumpTo(Number(b.dataset.index)));
     b.addEventListener('mouseenter', () => showTip(b));
-    b.addEventListener('mouseleave', hideTip);
+    b.addEventListener('mouseleave', scheduleHide);
     b.addEventListener('focus', () => showTip(b));
-    b.addEventListener('blur', hideTip);
+    b.addEventListener('blur', scheduleHide);
     track.appendChild(b);
     return b;
 }
@@ -107,11 +129,24 @@ function fieldLabel(card) {
     return String(card.dataset.key || '').replace(/_/g, ' ');
 }
 
+/* Primeras palabras del contenido del campo. Sirve para identificar de un vistazo
+   que campo es, y ademas convierte la etiqueta en un blanco de clic amplio: aunque
+   la marca mida 6px, el cuadro de la etiqueta puede ser de 200+ px y es clicable. */
+function fieldSnippet(card) {
+    const ce = card.querySelector('.field-card-body [contenteditable]')
+        || card.querySelector('.field-card-body > div:not(.hidden)');
+    const text = (ce?.textContent || card.querySelector('.field-card-body')?.textContent || '');
+    const t = String(text).replace(/\s+/g, ' ').trim();
+    if (!t) return '';
+    return t.length > 64 ? t.slice(0, 64).trimEnd() + '…' : t;
+}
+
 function hideRail() {
     rail.hidden = true;
     rail.classList.remove('is-visible');
     entries = [];
-    hideTip();
+    if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; }
+    if (tip) tip.classList.remove('is-visible');
 }
 
 function rebuild() {
@@ -132,6 +167,7 @@ function rebuild() {
             height: r.height,
             key: card.dataset.key || '',
             label: fieldLabel(card),
+            snippet: fieldSnippet(card),
         };
     }).sort((a, b) => a.top - b.top);
 
@@ -195,6 +231,12 @@ export function initFieldIndex() {
     tip.className = 'fi-tip';
     track.appendChild(viewport);
     rail.append(track, tip);
+
+    // La propia etiqueta es clicable: si el cursor pasa de la marca a la
+    // etiqueta, scheduleHide da tiempo a que se cancele al reentrar.
+    tip.addEventListener('click', () => jumpTo(Number(tip.dataset.index)));
+    tip.addEventListener('mouseenter', () => { if (hideTimer) { clearTimeout(hideTimer); hideTimer = 0; } });
+    tip.addEventListener('mouseleave', scheduleHide);
 
     scroller.addEventListener('mousemove', e => {
         const r = scroller.getBoundingClientRect();
