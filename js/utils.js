@@ -56,6 +56,35 @@ export const countObjFields = (o) => {
     return c;
 };
 
+/* ─── Peso del texto ───
+   Los tokens son una estimacion (~4 chars por token en castellano): sirven para
+   comparar cartas entre si y para saber si una se va a comer el contexto, no
+   para cuadrar la cuenta de un modelo concreto. Los umbrales son orientativos y
+   estan aqui, no repartidos por la UI, para que se puedan mover de una vez. */
+export const TOKENS_PER_CHAR = 1 / 4;
+export const HEAVY_FIELD = 1200; // tokens en un solo campo
+export const HEAVY_CARD = 3000;  // tokens en toda la carta procesada
+
+export function textStats(text) {
+    const s = String(text ?? '');
+    const chars = s.length;
+    const words = s.trim() ? s.trim().split(/\s+/).length : 0;
+    return { chars, words, tokens: Math.round(chars * TOKENS_PER_CHAR) };
+}
+
+export function statsLabel(text) {
+    const { chars, words, tokens } = textStats(text);
+    const n = (v) => v.toLocaleString('es');
+    return `${n(chars)} chars · ${n(words)} palabra${words === 1 ? '' : 's'} · ≈${n(tokens)} tokens`;
+}
+
+/* Marcadores {{char}} / {{user}} que siguen literales despues de procesar. Es el
+   fallo silencioso tipico: si no se rellena el nombre, la sustitucion no ocurre
+   y la carta se exporta con las llaves puestas. */
+export function countMarkers(text) {
+    return (String(text ?? '').match(/\{\{(?:char|user)\}\}/gi) || []).length;
+}
+
 export function setNestedValue(obj, path, value) {
     if (!obj || typeof obj !== 'object') throw new Error('Objeto invalido');
     const parts = path.split('.');

@@ -242,6 +242,35 @@ assert.ok(highlight(excerpt, 'dragon').includes('<mark class="search-hit">dragon
 assert.equal(buildExcerpt({ card: { data: {} } }, 'x'), '');
 assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
 
+/* ── Peso de la carta y marcadores sin sustituir ──
+   Helpers puros que alimentan la barra de estado y las insignias. El caso que
+   importa es el del nombre vacio: la sustitucion no llega, la carta se exporta
+   con las llaves puestas y antes la app decia "Ritual completado". */
+const { textStats, statsLabel, countMarkers, HEAVY_CARD } = await import(new URL('../js/utils.js', import.meta.url));
+
+assert.deepEqual(textStats(''), { chars: 0, words: 0, tokens: 0 });
+assert.deepEqual(textStats('   '), { chars: 3, words: 0, tokens: 1 });
+assert.deepEqual(textStats('Hola mundo'), { chars: 10, words: 2, tokens: 3 });
+assert.deepEqual(textStats(null), { chars: 0, words: 0, tokens: 0 });
+assert.match(statsLabel('Hola mundo'), /^10 chars · 2 palabras · ≈3 tokens$/);
+assert.match(statsLabel('Hola'), /1 palabra ·/);
+/* Ojo con el separador de millares: en es el CLDR fija minimumGroupingDigits=2,
+   asi que 1234 se escribe "1234" y solo a partir de 5 cifras aparece el punto.
+   No es un bug nuestro, es la convencion del idioma. */
+assert.match(statsLabel('a'.repeat(12345)), /^12\.345 chars · 1 palabra/);
+assert.match(statsLabel('a'.repeat(1234)), /^1234 chars/);
+// Los tokens son una estimacion, pero tienen que ser proporcionales: es lo que
+// permite comparar dos cartas y saber cual se come antes el contexto.
+assert.ok(textStats('a'.repeat(4000)).tokens > textStats('a'.repeat(400)).tokens * 9);
+assert.ok(HEAVY_CARD > 0);
+
+assert.equal(countMarkers('Hola {{char}}'), 1);
+assert.equal(countMarkers('{{char}} y {{USER}}'), 2);
+assert.equal(countMarkers('{{Char}} {{char}}'), 2);
+assert.equal(countMarkers('{{personaje}} {{char }}'), 0, 'Solo cuentan los marcadores exactos');
+assert.equal(countMarkers(''), 0);
+assert.equal(countMarkers(null), 0);
+
 /* ── Indice de la scrollbar ──
    Funcion pura que reparte las marcas por el rail. Es donde se cuelan los dos
    fallos tipicos: marcas de altura cero en los campos cortos, y solapes cuando

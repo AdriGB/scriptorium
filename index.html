@@ -46,6 +46,15 @@
         .editor-toggle-btn.active .toggle-dot{transform:translateX(16px);background:#3ab8a0;box-shadow:0 0 6px rgba(58,184,160,0.5)}
         .field-card.editor-card{border-left:3px solid transparent}
         .field-card.editor-card:hover{border-left-color:rgba(58,184,160,0.25)}
+        /* Destello al saltar a un campo con marcadores sin sustituir. Se anima el
+           borde, no el fondo: con texto largo detras, un flash de relleno se
+           confunde con una seleccion. */
+        @keyframes flashCard{0%{box-shadow:0 0 0 0 rgba(232,204,128,0)}25%{box-shadow:0 0 0 2px rgba(232,204,128,.75)}100%{box-shadow:0 0 0 0 rgba(232,204,128,0)}}
+        /* La curva va en crudo: Tailwind rastrea este fichero buscando nombres de
+           utilidad y genera CSS muerto hasta con una palabra dentro de un
+           comentario (ya nos paso una vez con otra cualquiera). */
+        .field-card.flash-card{animation:flashCard 1.4s cubic-bezier(0,0,.2,1)}
+        @media(prefers-reduced-motion:reduce){.field-card.flash-card{animation-duration:.01ms}}
         .editor-controls{opacity:0;transition:opacity 0.2s}
         .field-card:hover .editor-controls,.field-card:focus-within .editor-controls,.editor-controls:focus-within{opacity:1}
         @media(hover:none){.editor-controls{opacity:1}}
@@ -193,6 +202,7 @@
                 <button id="vaultStatus" class="hover:text-gold transition-colors" title="Abrir boveda"><i class="fa-solid fa-circle text-editor text-[0.45rem] mr-1"></i><span id="vaultStatusText">Guardado localmente</span></button>
                 <span><i class="fa-regular fa-file mr-1"></i><span id="statusFileName">Sin carta</span></span>
                 <span><i class="fa-solid fa-align-left mr-1"></i><span id="statusFields">0 campos</span></span>
+                <span><i class="fa-solid fa-weight-scale mr-1"></i><span id="statusWeight">sin texto</span></span>
                 <span><i class="fa-solid fa-book-atlas mr-1"></i><span id="statusLorebook">0 entradas de lorebook</span></span>
             </div>
             <div id="editorInfoBar" class="editor-bar hidden px-4 md:px-8 py-2 items-center gap-2 text-[0.7rem] text-editor font-cinzel tracking-wide shrink-0"><i class="fa-solid fa-pen-ruler"></i><span>Modo editor</span><div class="flex-1"></div><span class="text-text3 font-crimson italic tracking-normal">Ctrl+E para salir</span></div>

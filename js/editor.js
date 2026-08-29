@@ -1,5 +1,5 @@
 import state, { VF, getExtracted, RESERVED_KEYS } from './state.js';
-import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog } from './utils.js';
+import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog, textStats, statsLabel, countMarkers, HEAVY_FIELD, HEAVY_CARD } from './utils.js';
 import { extractFields, buildExp, findCardByKey } from './chara-card.js';
 import { trText, checkTranslationPrivacy } from './translator.js';
 
@@ -17,6 +17,34 @@ function setProcessedCount(value) {
     processedCount().textContent = value;
     const status = $('statusFields');
     if (status) status.textContent = value + ' campos';
+    updateWeight();
+}
+
+/* Peso de la carta procesada en la barra de estado. Se recalcula entera en vez
+   de llevar un acumulado: son veinte campos y asi no hay que perseguir cual
+   cambio (escribir, restaurar, borrar, anadir). */
+let weightTm = 0;
+export function updateWeight() {
+    const el = $('statusWeight');
+    if (!el) return;
+    const all = Object.values(state.proc.data).map(v => String(v ?? '')).join('\n');
+    if (!all.trim()) {
+        el.textContent = 'sin texto';
+        el.classList.remove('text-gold');
+        el.title = 'Peso aproximado de la carta procesada';
+        return;
+    }
+    const { tokens } = textStats(all);
+    el.textContent = statsLabel(all);
+    el.classList.toggle('text-gold', tokens >= HEAVY_CARD);
+    el.title = tokens >= HEAVY_CARD
+        ? 'Carta pesada: consumira bastante contexto en cada mensaje'
+        : 'Peso aproximado de la carta procesada';
+}
+
+function scheduleWeight() {
+    if (weightTm) return;
+    weightTm = setTimeout(() => { weightTm = 0; updateWeight(); }, 150);
 }
 
 /* ─── Helpers ─── */
@@ -85,6 +113,25 @@ export function resetCardState() {
     state.altGreetings.current = 0;
 }
 
+/* Insignia de peso: los chars a la vista y el detalle al pasar por encima, para
+   no ensanchar la cabecera de la tarjeta. En oro a partir del umbral. */
+function setCardStats(cc, text) {
+    const { chars, tokens } = textStats(text);
+    cc.textContent = chars.toLocaleString('es') + ' chars';
+    cc.title = statsLabel(text) + (tokens >= HEAVY_FIELD ? ' — campo muy pesado' : '');
+    cc.classList.toggle('text-gold', tokens >= HEAVY_FIELD);
+}
+
+/* Marcadores que quedaron literales en un campo ya procesado. */
+function setCardMarkers(mk, text) {
+    const n = countMarkers(text);
+    mk.classList.toggle('hidden', n === 0);
+    mk.textContent = n + ' sin sustituir';
+    mk.title = n === 1
+        ? 'Queda 1 marcador literal: rellena el nombre y vuelve a invocar'
+        : `Quedan ${n} marcadores literales: rellena el nombre y vuelve a invocar`;
+}
+
 /* ─── Create card ─── */
 export function createCard(key, text, isRaw) {
     const card = document.createElement('div');
@@ -101,14 +148,22 @@ export function createCard(key, text, isRaw) {
     const tT = document.createElement('span'); tT.className = 'truncate'; tT.textContent = key.replace(/_/g, ' ').replace(/\./g, ' › ');
     tEl.append(fI, tT);
 
-    const cc = document.createElement('span'); cc.className = 'text-[0.65rem] text-text3 font-crimson italic'; cc.textContent = text.length + ' chars';
+    const cc = document.createElement('span'); cc.className = 'text-[0.65rem] text-text3 font-crimson italic';
+    setCardStats(cc, text);
     const tg = document.createElement('i'); tg.className = 'fa-solid fa-chevron-down text-text3 text-[0.7rem] transition-transform duration-300';
     // Badge "editado": state.proc.edited ya se rastreaba en 11 sitios, pero nunca se mostraba.
     const ed = document.createElement('span');
     ed.className = 'edited-badge hidden shrink-0 text-[0.55rem] px-1.5 py-0.5 rounded font-crimson italic bg-editor/20 text-editor border border-editor/30';
     ed.textContent = 'editado';
     ed.title = 'Modificado manualmente';
+    /* Marcadores sin sustituir. En la vista original las llaves van resaltadas a
+       proposito, asi que la insignia solo tiene sentido en la procesada: si algo
+       sigue entre llaves ahi, es que la sustitucion no llego (nombre vacio). */
+    const mk = document.createElement('span');
+    mk.className = 'marker-badge hidden shrink-0 text-[0.55rem] px-1.5 py-0.5 rounded font-crimson italic bg-[#3a2900] text-[#e8cc80] border border-[#7a6230]/30';
+    mk.textContent = 'sin sustituir';
     head.append(tEl, cc, ed, tg);
+    if (!isRaw) { head.insertBefore(mk, tg); setCardMarkers(mk, text); }
 
     const body = document.createElement('div'); body.className = 'field-card-body px-5 py-4'; body.style.overflow = 'hidden';
 
@@ -140,7 +195,9 @@ export function createCard(key, text, isRaw) {
 
     if (!isRaw) ce.addEventListener('input', e => {
         state.proc.data[key] = e.target.innerText;
-        cc.textContent = e.target.innerText.length + ' chars';
+        setCardStats(cc, e.target.innerText);
+        setCardMarkers(mk, e.target.innerText);
+        scheduleWeight();
         state.proc.edited.add(key);
         ed.classList.remove('hidden');
         state.vault.dirty = true;
@@ -196,7 +253,8 @@ export function createCard(key, text, isRaw) {
                 const res = (o || '').replace(/\{\{char\}\}/gi, () => cn).replace(/\{\{user\}\}/gi, () => un);
                 ce.textContent = res; state.proc.data[key] = res; state.proc.edited.delete(key);
                 ed.classList.add('hidden');
-                cc.textContent = res.length + ' chars'; tC = null; tB.classList.add('hidden');
+                setCardStats(cc, res); setCardMarkers(mk, res); updateWeight();
+                tC = null; tB.classList.add('hidden');
                 state.vault.dirty = true;
                 if (tA) { tA.abort(); tA = null; }
                 showToast('Restaurado');
@@ -212,12 +270,15 @@ export function createCard(key, text, isRaw) {
 }
 
 /* ─── Render ─── */
-/* Refleja state.proc.edited en las tarjetas ya pintadas. */
-export function refreshEditedBadges() {
+/* Refleja en las tarjetas ya pintadas lo que se puede deducir del texto: campos
+   editados a mano y marcadores que quedaron sin sustituir. */
+export function refreshCardBadges() {
     processedView().querySelectorAll('.field-card').forEach(card => {
+        const key = card.dataset.key;
         const badge = card.querySelector('.edited-badge');
-        if (!badge) return;
-        badge.classList.toggle('hidden', !card.dataset.key || !state.proc.edited.has(card.dataset.key));
+        if (badge) badge.classList.toggle('hidden', !key || !state.proc.edited.has(key));
+        const mk = card.querySelector('.marker-badge');
+        if (mk && key) setCardMarkers(mk, state.proc.data[key] ?? '');
     });
 }
 
@@ -268,7 +329,7 @@ export function renderProc() {
         : '<i class="fa-solid fa-pen-to-square"></i> Clica para editar.';
     pv.appendChild(h);
     entries.forEach(([k, v], i) => { const c = createCard(k, v, false); c.style.animationDelay = i * 0.05 + 's'; pv.appendChild(c); });
-    refreshEditedBadges();
+    refreshCardBadges();
     if (state.editor.active) {
         decorateEd();
         const ab = document.createElement('button');
@@ -416,11 +477,37 @@ export function processText() {
        ni el fichero ni el lorebook. Si no habia nada antes no se ofrece:
        deshacer hacia un panel vacio se confunde con un fallo, no con un retorno. */
     const canUndo = Object.keys(prev).length > 0;
+    /* Marcadores que quedaron literales: si falto el nombre del personaje o del
+       aventurero, la sustitucion no llega y la carta se exporta con las llaves
+       puestas — antes el aviso decia "Ritual completado" y no habia forma de
+       enterarse. Es mas urgente que el recuento, asi que se queda con el aviso
+       (y con su unica accion) cuando los hay. */
+    const pending = Object.values(state.proc.data).reduce((a, v) => a + countMarkers(v), 0);
+    if (pending) {
+        showToast(`${pending} marcador${pending === 1 ? '' : 'es'} sin sustituir`, 'error',
+            { label: 'Ver', onClick: jumpToMarker });
+        return;
+    }
     const msg = hits
         ? `${hits} sustitucion${hits === 1 ? '' : 'es'} en ${touched} campo${touched === 1 ? '' : 's'}`
         : 'Ritual completado';
     showToast(msg, hits ? 'success' : 'info',
         canUndo ? { label: 'Deshacer', onClick: () => restoreProcessed(prev, prevEdited) } : null);
+}
+
+/* Salta al primer campo con marcadores literales, lo abre si estaba plegado y lo
+   destaca un momento: con la carta entera delante, decir "hay 7" no sirve de
+   mucho si no se ve donde estan. */
+function jumpToMarker() {
+    const card = [...processedView().querySelectorAll('.field-card')]
+        .find(c => countMarkers(state.proc.data[c.dataset.key] ?? '') > 0);
+    if (!card) return;
+    if (card.classList.contains('collapsed')) card.querySelector('.field-card-head')?.click();
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Sin el reflow de por medio, repetir el salto no reinicia la animacion.
+    card.classList.remove('flash-card');
+    void card.offsetWidth;
+    card.classList.add('flash-card');
 }
 
 /* Vuelta atras de "Invocar y sustituir". Recupera tambien el conjunto de campos

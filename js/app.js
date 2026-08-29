@@ -5,7 +5,7 @@ import { extPNG } from './png-parser.js';
 import vault from './storage.js';
 import { openVault, saveCurrentToVault } from './vault.js';
 import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel, exportCurrentProfile, importProfileFile, exportAllProfiles, importProfilesBundle } from './profiles.js';
-import { processText, renderRaw, renderProc, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount, emptyFieldsState } from './editor.js';
+import { processText, renderRaw, renderProc, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount, updateWeight, emptyFieldsState } from './editor.js';
 import { openExpModal, closeExpModal, copyAll } from './export.js';
 import { initCanvas, initSidebar, initTabs, setActiveTab, initSearch, initAbout, initExpandModal, initAddFieldModal, initExportModal, initJsonEditor, initConfirmModal, initFocusTraps, initShortcutsModal, initWelcome, closeShortcuts } from './ui.js';
 import { initFieldIndex } from './field-index.js';
@@ -61,6 +61,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const fieldStatus = $('statusFields');
         if (fileStatus) fileStatus.textContent = loaded ? (fileName || 'Carta cargada') : 'Sin carta';
         if (fieldStatus) fieldStatus.textContent = count + ' campos';
+        // El peso se recalcula desde el estado, asi que tambien limpia al vaciar.
+        updateWeight();
     }
 
     function refreshVisibleJSON() {
