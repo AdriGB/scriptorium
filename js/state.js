@@ -31,7 +31,10 @@ const state = {
     // reexportar sin volver a seleccionar la misma imagen. No entra en la sesion
     // del vault (storage.js solo persiste file.uploaded).
     file: { uploaded: null, extracted: {}, pngFile: null },
-    proc: { data: {}, edited: new Set() },
+    // proc.collapsed: que tarjetas estan plegadas, por clave (prefijo RAW_PFX
+    // para las de la vista original). Vive aqui porque cada repintado reconstruye
+    // el arbol y en el DOM no queda rastro de como estaba.
+    proc: { data: {}, edited: new Set(), collapsed: new Set() },
     editor: { active: false, added: new Set(), removed: new Set(), delKey: null, delTm: null },
     jsonEditor: { snap: null, dirty: false, err: null, mode: 'tree' },
     characterBook: { present: false, metadata: {}, entries: [] },

@@ -12,6 +12,66 @@ const processedCount = () => $('processedCount');
 const rawCount = () => $('rawCount');
 const processBtn = () => $('processBtn');
 const fabContainer = () => $('fabContainer');
+const resultsArea = () => $('resultsArea');
+
+/* ─── Vista entre repintados ───
+   renderProc, renderRaw y renderLorebook reconstruyen el arbol entero, asi que
+   el contenedor se quedaba sin alto un instante (el scroll volvia al techo) y
+   las tarjetas se pintaban todas abiertas. Activar el modo editor pasaba por
+   ahi, y con la carta a media pantalla perdias el campo que estabas mirando.
+   El ancla guarda QUE tarjeta estaba en el borde superior, no el pixel: al
+   anadir o borrar un campo las alturas cambian, pero la tarjeta que el usuario
+   tenia delante sigue siendo esa. */
+/* Prefijos para que convivan en el mismo conjunto los campos procesados
+   (clave pelada), los de la vista original y las entradas del lorebook
+   (por posicion). Ningun nombre de campo puede empezar asi: sanitizeKey
+   deja solo [a-z0-9_]. */
+const RAW_PFX = 'raw ';
+const LB_PFX = 'lb:';
+
+function captureAnchor(view) {
+    const sc = resultsArea();
+    if (!sc || !view || view.classList.contains('hidden')) return null;
+    const cards = [...view.querySelectorAll('.field-card')];
+    if (!cards.length) return null;
+    const top = sc.getBoundingClientRect().top;
+    const card = cards.find(c => c.getBoundingClientRect().bottom > top + 1);
+    if (!card) return null;
+    return {
+        key: card.dataset.key ?? null,
+        lb: card.dataset.lbIndex ?? null,
+        y: Math.round(card.getBoundingClientRect().top - top)
+    };
+}
+
+/* Si la tarjeta ancla ya no existe (cargaste otra carta) no se toca el scroll:
+   quedarse "donde estabas" en una lista distinta no significa nada. */
+function restoreAnchor(view, anchor) {
+    const sc = resultsArea();
+    if (!sc || !view || !anchor) return;
+    // Se recorre en vez de usar un selector: los nombres de campo van dentro de
+    // un atributo y habria que escaparlos (CSS.escape) para que no casen raro.
+    const card = [...view.querySelectorAll('.field-card')]
+        .find(c => anchor.key != null ? c.dataset.key === anchor.key : c.dataset.lbIndex === anchor.lb);
+    if (!card) return;
+    sc.scrollTop += card.getBoundingClientRect().top - sc.getBoundingClientRect().top - anchor.y;
+}
+
+/* Un campo borrado o renombrado no debe dejar su marca de plegado: si mas
+   adelante otro campo se llama igual, apareceria cerrado sin motivo. Solo se
+   tocan las claves del espacio propio (procesado o vista original): si no, las
+   del lorebook ('lb:0') caerian aqui por no estar entre los campos vivos. */
+function pruneCollapsed(isRaw, liveKeys) {
+    const pfx = isRaw ? RAW_PFX : '';
+    const live = new Set(liveKeys);
+    for (const ck of state.proc.collapsed) {
+        const mine = pfx
+            ? ck.startsWith(pfx)
+            : !ck.startsWith(RAW_PFX) && !ck.startsWith(LB_PFX);
+        if (!mine) continue;
+        if (!live.has(ck.slice(pfx.length))) state.proc.collapsed.delete(ck);
+    }
+}
 
 function setProcessedCount(value) {
     processedCount().textContent = value;
@@ -99,6 +159,7 @@ export function resetCardState() {
     clearFDC();
     state.proc.data = {};
     state.proc.edited.clear();
+    state.proc.collapsed.clear();
     state.editor.added.clear();
     state.editor.removed.clear();
     state.file.extracted = {};
@@ -172,9 +233,9 @@ export function applyTranslation(key, text, els = {}) {
 }
 
 /* ─── Create card ─── */
-export function createCard(key, text, isRaw) {
+export function createCard(key, text, isRaw, animate = true) {
     const card = document.createElement('div');
-    card.className = 'field-card bg-surface border border-border1 rounded-xl overflow-hidden mb-4 transition-all duration-300 hover:border-border2 hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-fade-in-up';
+    card.className = 'field-card bg-surface border border-border1 rounded-xl overflow-hidden mb-4 transition-all duration-300 hover:border-border2 hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)]' + (animate ? ' animate-fade-in-up' : '');
     card.dataset.key = key;
 
     const head = document.createElement('div');
@@ -206,8 +267,18 @@ export function createCard(key, text, isRaw) {
 
     const body = document.createElement('div'); body.className = 'field-card-body px-5 py-4'; body.style.overflow = 'hidden';
 
+    /* La tarjeta se construye despegada del documento: si la clase se pone aqui,
+       entra en el arbol ya plegada y no hay parpadeo de apertura. El max-height
+       lo impone .collapsed con !important, asi que no hace falta fijarlo. */
+    const collapseKey = (isRaw ? RAW_PFX : '') + key;
+    if (state.proc.collapsed.has(collapseKey)) {
+        card.classList.add('collapsed');
+        head.setAttribute('aria-expanded', 'false');
+    }
+
     const togC = () => {
         const c = !card.classList.contains('collapsed');
+        if (c) state.proc.collapsed.add(collapseKey); else state.proc.collapsed.delete(collapseKey);
         if (c) { body.style.maxHeight = body.scrollHeight + 'px'; requestAnimationFrame(() => { card.classList.add('collapsed'); body.style.maxHeight = '0px'; }); }
         else { card.classList.remove('collapsed'); body.style.maxHeight = body.scrollHeight + 'px'; body.addEventListener('transitionend', function oe(e) { if (e.propertyName === 'max-height') { body.style.maxHeight = 'none'; body.removeEventListener('transitionend', oe); } }); }
         head.setAttribute('aria-expanded', String(!c));
@@ -355,19 +426,33 @@ export function emptyFieldsState(glyphHtml, title, hint) {
 
 export function renderRaw() {
     const rv = rawView();
+    const animate = !rv.querySelector('.field-card');
+    const anchor = captureAnchor(rv);
     rv.innerHTML = '<p class="text-[0.78rem] text-text3 italic mb-4 px-1">Plantilla: <span class="tag-char">{{char}}</span> y <span class="tag-user">{{user}}</span></p>';
     const entries = Object.entries(getExtracted());
-    if (entries.length) entries.forEach(([k, v]) => rv.appendChild(createCard(k, v, true)));
+    pruneCollapsed(true, entries.map(([k]) => k));
+    if (entries.length) entries.forEach(([k, v], i) => {
+        const c = createCard(k, v, true, animate);
+        if (animate) c.style.animationDelay = i * 0.05 + 's';
+        rv.appendChild(c);
+    });
     // Antes la pestana quedaba en blanco salvo el pie de plantilla: sin carta no
     // se explicaba por que no habia nada.
     else rv.appendChild(emptyFieldsState('<i class="fa-solid fa-scroll"></i>', 'La plantilla no tiene campos.', 'Carga una carta para ver aqui sus campos originales.'));
     announceRender();
+    restoreAnchor(rv, anchor);
 }
 
 export function renderProc() {
     clearFDC();
     const entries = Object.entries(state.proc.data);
     const pv = processedView();
+    /* La entrada escalonada solo en la primera pintura de un conjunto. Repetirla
+       en cada repintado (activar el editor, borrar un campo, reproducir el
+       ritual) hacia temblar la lista entera durante casi un segundo. */
+    const animate = !pv.querySelector('.field-card');
+    const anchor = captureAnchor(pv);
+    pruneCollapsed(false, entries.map(([k]) => k));
     pv.innerHTML = '';
     if (entries.length === 0 && !state.editor.active) {
         pv.appendChild(emptyFieldsState('&#5765;', 'Las paginas aguardan.', 'Procesa la carta para ver aqui el resultado.'));
@@ -379,13 +464,17 @@ export function renderProc() {
         ? '<i class="fa-solid fa-pen-ruler text-editor"></i> Editor activo.'
         : '<i class="fa-solid fa-pen-to-square"></i> Clica para editar.';
     pv.appendChild(h);
-    entries.forEach(([k, v], i) => { const c = createCard(k, v, false); c.style.animationDelay = i * 0.05 + 's'; pv.appendChild(c); });
+    entries.forEach(([k, v], i) => {
+        const c = createCard(k, v, false, animate);
+        if (animate) c.style.animationDelay = i * 0.05 + 's';
+        pv.appendChild(c);
+    });
     refreshCardBadges();
     if (state.editor.active) {
         decorateEd();
         const ab = document.createElement('button');
-        ab.className = 'add-field-btn w-full flex items-center justify-center gap-3 py-6 text-text3 hover:text-editor transition-all animate-fade-in-up';
-        ab.style.animationDelay = entries.length * 0.05 + 's';
+        ab.className = 'add-field-btn w-full flex items-center justify-center gap-3 py-6 text-text3 hover:text-editor transition-all' + (animate ? ' animate-fade-in-up' : '');
+        if (animate) ab.style.animationDelay = entries.length * 0.05 + 's';
         ab.innerHTML = '<i class="fa-solid fa-plus text-lg"></i> <span class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase">Agregar Campo</span>';
         ab.addEventListener('click', openAddF);
         pv.appendChild(ab);
@@ -395,6 +484,10 @@ export function renderProc() {
     updFab();
     updLorebookCount();
     announceRender();
+    /* El ancla se restituye al final de todo: el aviso reaplica el buscador, que
+       oculta tarjetas con `display:none`, y el decorado cambia altos. Medir
+       antes dejaria el ancla calculada sobre unas alturas que ya no valen. */
+    restoreAnchor(pv, anchor);
 }
 
 /* ─── Editor decorations ─── */
@@ -473,6 +566,8 @@ export function renameField(oldKey, newName) {
     if (i === -1) return;
     e[i] = [nk, e[i][1]];
     state.proc.data = Object.fromEntries(e);
+    // Si estaba plegada, sigue plegada con el nombre nuevo.
+    if (state.proc.collapsed.delete(oldKey)) state.proc.collapsed.add(nk);
     if (state.proc.edited.has(oldKey)) { state.proc.edited.delete(oldKey); state.proc.edited.add(nk); }
     if (state.editor.added.has(oldKey)) { state.editor.added.delete(oldKey); state.editor.added.add(nk); }
     else state.editor.removed.add(oldKey);
@@ -572,17 +667,27 @@ function restoreProcessed(data, edited) {
     showToast('Sustitucion deshecha', 'info');
 }
 
-/* ─── Toggle editor ─── */
-export function togEd() {
+/* ─── Toggle editor ───
+   notify=false es para la restauracion de sesion: alli el editor vuelve a estar
+   activo porque lo estaba al cerrar, no porque lo acabe de pedir el usuario, y
+   avisar de algo que no ha hecho solo anade ruido. */
+export function togEd({ notify = true } = {}) {
     state.editor.active = !state.editor.active;
-    $('editorToggle').classList.toggle('active', state.editor.active);
-    $('editorToggle').setAttribute('aria-pressed', String(state.editor.active));
+    const btn = $('editorToggle');
+    btn.classList.toggle('active', state.editor.active);
+    btn.setAttribute('aria-pressed', String(state.editor.active));
     $('editorInfoBar').classList.toggle('hidden', !state.editor.active);
     if (state.editor.active && processedView().classList.contains('hidden') && $('lorebookView')?.classList.contains('hidden')) $('tabProcessed').click();
     if (Object.keys(state.proc.data).length > 0 || state.editor.active) renderProc();
     if (!$('lorebookView')?.classList.contains('hidden')) renderLorebook();
     updFab();
-    showToast(state.editor.active ? 'Editor activado' : 'Editor desactivado', 'info');
+    /* Al apagar no se avisa: el boton pierde el color y la barra de editor
+       desaparece, que es justo la confirmacion que se buscaba. Al encender si,
+       y con la vuelta atras a mano, porque es el momento en que el usuario
+       todavia no tiene claro que puede salir como entro. */
+    if (notify && state.editor.active) {
+        showToast('Modo editor activado', 'success', { label: 'Deshacer', onClick: () => togEd({ notify: false }) });
+    }
 }
 
 /* ─── FAB ─── */
@@ -929,8 +1034,16 @@ function moveLorebookEntry(index, dir) {
 export function renderLorebook() {
     const lv = $('lorebookView');
     if (!lv) return;
+    const animate = !lv.querySelector('.field-card');
+    const anchor = captureAnchor(lv);
     lv.innerHTML = '';
     const entries = state.characterBook.entries;
+    // Las entradas se identifican por posicion: al borrar, la ultima se cae.
+    for (const ck of state.proc.collapsed) {
+        if (!ck.startsWith(LB_PFX)) continue;
+        const n = Number(ck.slice(LB_PFX.length));
+        if (!(n >= 0 && n < entries.length)) state.proc.collapsed.delete(ck);
+    }
 
     if (entries.length === 0 && !state.editor.active) {
         lv.innerHTML = '<div class="flex flex-col items-center justify-center h-full min-h-[40vh] text-center px-4"><div class="text-5xl opacity-20 mb-4"><i class="fa-solid fa-book-atlas text-text3"></i></div><p class="text-text3 italic max-w-sm text-sm">Sin entradas de lorebook.</p><p class="text-text3/60 text-xs mt-2">Carga un tomo con character_book o activa el editor para crear entradas.</p></div>';
@@ -947,8 +1060,8 @@ export function renderLorebook() {
 
     entries.forEach((entry, i) => {
         const card = document.createElement('div');
-        card.className = 'field-card bg-surface border border-border1 rounded-xl overflow-hidden mb-4 transition-all duration-300 hover:border-border2 hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)] animate-fade-in-up';
-        card.style.animationDelay = i * 0.05 + 's';
+        card.className = 'field-card bg-surface border border-border1 rounded-xl overflow-hidden mb-4 transition-all duration-300 hover:border-border2 hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)]' + (animate ? ' animate-fade-in-up' : '');
+        if (animate) card.style.animationDelay = i * 0.05 + 's';
         card.dataset.lbIndex = i;
 
         // Head
@@ -981,8 +1094,15 @@ export function renderLorebook() {
         body.className = 'field-card-body px-5 py-4';
         body.style.overflow = 'hidden';
 
+        const collapseKey = LB_PFX + i;
+        if (state.proc.collapsed.has(collapseKey)) {
+            card.classList.add('collapsed');
+            head.setAttribute('aria-expanded', 'false');
+        }
+
         const togC = () => {
             const c = !card.classList.contains('collapsed');
+            if (c) state.proc.collapsed.add(collapseKey); else state.proc.collapsed.delete(collapseKey);
             if (c) { body.style.maxHeight = body.scrollHeight + 'px'; requestAnimationFrame(() => { card.classList.add('collapsed'); body.style.maxHeight = '0px'; }); }
             else { card.classList.remove('collapsed'); body.style.maxHeight = body.scrollHeight + 'px'; body.addEventListener('transitionend', function oe(e) { if (e.propertyName === 'max-height') { body.style.maxHeight = 'none'; body.removeEventListener('transitionend', oe); } }); }
             head.setAttribute('aria-expanded', String(!c));
@@ -1091,8 +1211,8 @@ export function renderLorebook() {
 
     if (state.editor.active) {
         const addBtn = document.createElement('button');
-        addBtn.className = 'add-field-btn w-full flex items-center justify-center gap-3 py-6 text-text3 hover:text-editor transition-all animate-fade-in-up';
-        addBtn.style.animationDelay = entries.length * 0.05 + 's';
+        addBtn.className = 'add-field-btn w-full flex items-center justify-center gap-3 py-6 text-text3 hover:text-editor transition-all' + (animate ? ' animate-fade-in-up' : '');
+        if (animate) addBtn.style.animationDelay = entries.length * 0.05 + 's';
         addBtn.innerHTML = '<i class="fa-solid fa-plus text-lg"></i> <span class="font-cinzel text-[0.7rem] tracking-[0.15em] uppercase">Agregar Entrada</span>';
         addBtn.addEventListener('click', addLorebookEntry);
         lv.appendChild(addBtn);
@@ -1100,4 +1220,5 @@ export function renderLorebook() {
 
     updLorebookCount();
     announceRender();
+    restoreAnchor(lv, anchor);
 }

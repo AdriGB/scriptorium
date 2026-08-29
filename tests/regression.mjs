@@ -518,4 +518,47 @@ for (const file of jsFiles) {
 }
 assert.deepEqual(undefinedIdents, [], 'Identificadores sin declarar dentro de template literals');
 
+/* Alternar el modo editor repinta la vista entera, y eso tiraba el scroll al
+   techo, reabria las tarjetas plegadas y repetia la entrada escalonada. Las
+   tres vistas se reparan igual, asi que mirar el fichero entero no vale: una
+   sola cumpliria el patron de las otras dos. Se extrae el cuerpo de cada una. */
+for (const name of ['renderProc', 'renderRaw', 'renderLorebook']) {
+    const m = editorSource.match(new RegExp('export function ' + name + '\\([\\s\\S]*?\\n\\}'));
+    assert.ok(m, 'No se encuentra el cuerpo de ' + name);
+    const body = m[0];
+    assert.match(body, /captureAnchor\(/, name + ' no guarda el ancla: repintar manda al usuario al techo');
+    assert.match(body, /restoreAnchor\(/, name + ' no restaura el ancla despues de repintar');
+    assert.match(body, /querySelector\('\.field-card'\)/, name + ' no comprueba si ya habia tarjetas: la entrada escalonada se repetiria');
+    /* El ancla se mide AL FINAL: el aviso de repintado reaplica el buscador, que
+       oculta tarjetas con display:none, y el decorado cambia altos. Con el ancla
+       antes, las alturas sobre las que se calculo ya no son las de la pantalla. */
+    assert.ok(body.lastIndexOf('restoreAnchor(') > body.lastIndexOf('announceRender('),
+        name + ' restaura el ancla antes de reaplicar el buscador: se mediria sobre alturas que no valen');
+}
+assert.ok(editorSource.indexOf('restoreAnchor(pv, anchor)') > editorSource.indexOf('decorateEd();'),
+    'El ancla se restaura antes del decorado del editor');
+
+/* El plegado sobrevive al repintado porque se guarda en state, no en el DOM. */
+assert.match(editorSource, /const collapseKey = \(isRaw \? RAW_PFX : ''\) \+ key;/, 'Falta la clave de plegado de los campos');
+assert.match(editorSource, /const collapseKey = LB_PFX \+ i;/, 'Falta la clave de plegado del lorebook');
+assert.match(editorSource, /state\.proc\.collapsed\.add\(collapseKey\); else state\.proc\.collapsed\.delete\(collapseKey\)/,
+    'Plegar una tarjeta no se anota en el estado');
+assert.match(editorSource, /state\.proc\.collapsed\.clear\(\)/, 'Cargar otra carta deja plegados heredados');
+/* Las tres clases de clave conviven en el mismo conjunto, asi que la poda de
+   una no puede barrer las de las otras: las del lorebook ('lb:0') no estan
+   entre los campos vivos y desapareceria su plegado en cada repintado. */
+const pruneBody = editorSource.match(/function pruneCollapsed\([\s\S]*?\n\}/);
+assert.ok(pruneBody, 'No se encuentra el cuerpo de pruneCollapsed');
+assert.match(pruneBody[0], /ck\.startsWith\(LB_PFX\)/, 'La poda de campos se lleva por delante el plegado del lorebook');
+assert.match(pruneBody[0], /ck\.startsWith\(RAW_PFX\)/, 'La poda de campos se lleva por delante el plegado de la vista original');
+
+/* Apagar el editor no avisa: el boton pierde el color y la barra desaparece,
+   que es la confirmacion. Y la restauracion de sesion tampoco, porque ahi el
+   usuario no ha hecho nada. */
+const togEdBody = editorSource.match(/export function togEd\([\s\S]*?\n\}/);
+assert.ok(togEdBody, 'No se encuentra el cuerpo de togEd');
+assert.match(togEdBody[0], /\{ notify = true \} = \{\}/, 'togEd debe poder callarse');
+assert.match(togEdBody[0], /notify && state\.editor\.active/, 'Apagar el editor avisa de algo que el boton ya esta diciendo');
+assert.match(appSourceFull, /togEd\(\{ notify: false \}\)/, 'Restaurar la sesion avisa de un editor que nadie acaba de activar');
+
 console.log('Regresiones funcionales: OK');

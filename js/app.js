@@ -138,7 +138,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (restoredCount > 0 || Object.keys(state.proc.data).length > 0 || sysPromptInput?.value.trim()) processText();
         else { renderProc(); if (state.characterBook.present) $('tabLorebook')?.click(); }
         renderJSONSafely();
-        if (saved.editorActive && !state.editor.active) togEd();
+        if (saved.editorActive && !state.editor.active) togEd({ notify: false });
         autoSidebarCollapse();
     }
 
@@ -348,7 +348,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeExp(); closeAddF(); closeExpModal(); rstDel();
         if (fileInput) fileInput.value = '';
         state.file.uploaded = null; state.file.extracted = {}; state.file.pngFile = null;
-        state.proc.data = {}; state.proc.edited.clear();
+        state.proc.data = {}; state.proc.edited.clear(); state.proc.collapsed.clear();
         state.editor.active = false; state.editor.added.clear(); state.editor.removed.clear();
         state.jsonEditor.snap = null; state.jsonEditor.dirty = false; state.jsonEditor.err = null;
         state.characterBook.entries = [];
