@@ -113,6 +113,27 @@ export function deserialize(snap) {
     return d;
 }
 
+/* ── Huella del trabajo pendiente ──
+   Antes habia que acordarse de poner `state.vault.dirty = true` en cada sitio
+   que tocaba algo (unos veinte, repartidos entre app.js y editor.js), y se
+   olvidaba: el aviso al cerrar prometia guardar y no se guardaba nada. Ahora se
+   deriva de comparar el estado con la ultima copia.
+
+   Se excluye savedAt, que cambia en cada serializacion. Y lo que no es trabajo
+   del usuario tampoco cuenta: el plegado, el temporizador del borrado
+   confirmado, el lienzo de fondo, la pestana activa. Todo eso vive fuera del
+   snapshot persistible, asi que la huella lo ignora sin listarlo aqui. */
+export function revision(s = state) {
+    const snap = serialize(s, { persist: true });
+    snap.savedAt = 0;
+    return JSON.stringify(snap);
+}
+
+/** ¿Hay cambios sin guardar desde el ultimo `saveSession` (o la base inicial)? */
+export function isDirty(s = state) {
+    return revision(s) !== s.vault.savedRev;
+}
+
 /** ¿Es de una version anterior a la actual? Sirve para avisar sin perder datos. */
 export function isLegacy(snap) {
     return Boolean(snap) && snap.version !== SNAPSHOT_VERSION;

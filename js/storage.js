@@ -1,4 +1,4 @@
-import { serialize } from './snapshot.js';
+import { serialize, revision, isDirty } from './snapshot.js';
 
 const DB_NAME = 'scriptorium_vault';
 const DB_VERSION = 1;
@@ -105,7 +105,10 @@ export class Vault {
             /* El formato es cosa de snapshot.js: aqui solo se anade `id`, que es
                el keyPath del store. `persist` deja fuera el File del PNG porque
                JSON.stringify lo mide como `{}` y la compuerta de tamaño dejaria
-               de cumplir su funcion. */
+               de cumplir su funcion. La huella se toma antes de serializar: si
+               algo cambia mientras se escribe, la diferencia queda pendiente
+               para el siguiente tick en vez de darse por guardada sin estarlo. */
+            const rev = revision(state);
             const snap = { id: 'current', ...serialize(state, { persist: true }) };
             const size = JSON.stringify(snap).length;
             if (size > 4 * 1024 * 1024) {
@@ -113,6 +116,7 @@ export class Vault {
                 return false;
             }
             await dbPut(this.db, STORES.SESSIONS, snap);
+            state.vault.savedRev = rev;
             this._emit('session-saved', snap.savedAt);
             return true;
         } catch (e) {
@@ -124,24 +128,17 @@ export class Vault {
     async loadSession() { return this.db ? dbGet(this.db, STORES.SESSIONS, 'current') : null; }
     async clearSession() { if (this.db) await dbDelete(this.db, STORES.SESSIONS, 'current'); }
 
-    // FIX: autosave solo guarda si dirty
+    /* El autosave compara la huella del estado con la del ultimo guardado. Si
+       algo muta sin que nadie lo anote, se entera igual. */
     startAutoSave(getStateFn, interval = AUTO_SAVE_MS) {
         this.stopAutoSave();
+        // Base: lo que habia al arrancar. Sin ella se guardaria una sesion vacia.
+        const s0 = getStateFn();
+        if (s0) s0.vault.savedRev = revision(s0);
         this._autoSaveTimer = setInterval(async () => {
             try {
                 const s = getStateFn();
-                /* La compuerta exigia campos procesados, asi que editar el nombre
-                   de una carta recien cargada marcaba `dirty`, hacia saltar el
-                   aviso al cerrar y aun asi no se guardaba nada: prometia una red
-                   que no existia. Con carta cargada ya hay trabajo que perder. */
-                const hasWork = Boolean(s?.file?.uploaded) ||
-                    Object.keys(s?.proc?.data || {}).length > 0 ||
-                    Boolean(s?.characterBook?.present) ||
-                    (s?.altGreetings?.list?.length || 0) > 0;
-                if (s && s.vault.dirty && hasWork) {
-                    const saved = await this.saveSession(s);
-                    if (saved) s.vault.dirty = false;
-                }
+                if (s && isDirty(s)) await this.saveSession(s);
             } catch (e) { console.warn('autosave', e); }
         }, interval);
     }

@@ -69,7 +69,7 @@ assert.doesNotMatch(clipboardText, /Prompt obsoleto/);
    snapshot.js es el unico sitio que define el contrato: la sesion de IndexedDB
    (storage.js) y el "Deshacer" (app.js) tienen que hablar el mismo idioma. Si se
    anade un campo al estado y se olvida en serialize(), el round-trip lo delata. */
-const { serialize, deserialize, apply, isLegacy, SNAPSHOT_VERSION } =
+const { serialize, deserialize, apply, isLegacy, revision, isDirty, SNAPSHOT_VERSION } =
     await import('../js/snapshot.js');
 
 state.file.extracted = { description: 'Texto', ['__proto__']: 'no', constructor: 'no' };
@@ -112,6 +112,24 @@ delete state.proc.data.personality;
 apply(snap);
 assert.equal(state.proc.data.personality, 'Procesado', 'apply() vuelca la sesion en el estado');
 assert.equal(elements.get('charName').value, 'Alice', 'apply() restaura el formulario');
+
+/* La huella sustituye al `state.vault.dirty = true` que habia que acordarse de
+   poner en unos veinte sitios. Lo que se hace aqui es lo que antes se olvidaba. */
+state.vault.savedRev = revision(state);
+assert.equal(isDirty(state), false, 'Recien guardado no hay trabajo pendiente');
+state.proc.data.description = 'Otro texto';
+assert.equal(isDirty(state), true, 'Tocar un campo cuenta sin que nadie lo marque');
+
+state.vault.savedRev = revision(state);
+state.tr.mc = new AbortController();
+state.ui.dCnf = true;
+state.proc.collapsed.add('description');
+assert.equal(isDirty(state), false,
+    'Lo efimero (traduccion, modales, plegado) no es trabajo pendiente');
+
+const revBefore = revision(state);
+await new Promise(r => setTimeout(r, 5));
+assert.equal(revision(state), revBefore, 'savedAt no entra en la huella: cambia en cada serialize');
 
 const serviceWorkerSource = await readFile(new URL('../service-worker.js', import.meta.url), 'utf8');
 const appSource = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');

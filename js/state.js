@@ -46,7 +46,10 @@ const state = {
     ui: { dCnf: false, dTm: null },
     canvas: { run: true },
     tr: { mc: null, ma: null },
-    vault: { db: null, autoSaveInterval: null, dirty: false }
+    // savedRev: huella del estado tal cual se guardo por ultima vez (o tal cual
+    // estaba al arrancar). No se marca a mano: se compara. Ver revision() en
+    // snapshot.js.
+    vault: { db: null, autoSaveInterval: null, savedRev: null }
 };
 
 export default state;

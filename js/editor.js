@@ -200,7 +200,6 @@ function setCardMarkers(mk, text) {
 function writeFieldText(key, text, els = {}) {
     state.proc.data[key] = text;
     state.proc.edited.add(key);
-    state.vault.dirty = true;
     if (els.ce) els.ce.textContent = text;
     if (els.cc) setCardStats(els.cc, text);
     scheduleWeight();
@@ -311,7 +310,6 @@ export function createCard(key, text, isRaw, animate = true) {
         scheduleWeight();
         state.proc.edited.add(key);
         ed.classList.remove('hidden');
-        state.vault.dirty = true;
         tC = null; tB.classList.add('hidden');
         if (tA) { tA.abort(); tA = null; }
     });
@@ -377,7 +375,6 @@ export function createCard(key, text, isRaw, animate = true) {
                 ed.classList.add('hidden');
                 setCardStats(cc, res); setCardMarkers(mk, res); updateWeight();
                 tC = null; tB.classList.add('hidden');
-                state.vault.dirty = true;
                 if (tA) { tA.abort(); tA = null; }
                 showToast('Restaurado');
             });
@@ -530,14 +527,12 @@ export function movField(key, dir) {
     if (ni < 0 || ni >= e.length) return;
     [e[i], e[ni]] = [e[ni], e[i]];
     state.proc.data = Object.fromEntries(e);
-    state.vault.dirty = true;
     renderProc();
 }
 
 export function addField(key, val) {
     state.proc.data[key] = val;
     state.proc.edited.add(key); state.editor.added.add(key); state.editor.removed.delete(key);
-    state.vault.dirty = true;
     setProcessedCount(Object.keys(state.proc.data).length);
     renderProc();
 }
@@ -548,7 +543,6 @@ export function deleteField(key) {
     if (state.editor.added.has(key)) state.editor.added.delete(key);
     else state.editor.removed.add(key);
     delete getExtracted()[key];
-    state.vault.dirty = true;
     setProcessedCount(Object.keys(state.proc.data).length);
     renderProc(); updFab();
     showToast('"' + key + '" eliminado', 'info');
@@ -572,7 +566,6 @@ export function renameField(oldKey, newName) {
     if (state.editor.added.has(oldKey)) { state.editor.added.delete(oldKey); state.editor.added.add(nk); }
     else state.editor.removed.add(oldKey);
     if (getExtracted()[oldKey] !== undefined) { getExtracted()[nk] = getExtracted()[oldKey]; delete getExtracted()[oldKey]; }
-    state.vault.dirty = true;
     renderProc();
     showToast('Renombrado a "' + nk + '"');
 }
@@ -615,7 +608,6 @@ export function processText() {
     }
     for (const ek of state.editor.added) if (prev[ek] !== undefined && state.proc.data[ek] === undefined) state.proc.data[ek] = prev[ek];
     setProcessedCount(Object.keys(state.proc.data).length);
-    state.vault.dirty = true;
     renderProc();
     $('tabProcessed').click();
     /* Deshacer, igual que en "Limpiar todo": el aviso lleva la accion. Aqui
@@ -661,7 +653,6 @@ function jumpToMarker() {
 function restoreProcessed(data, edited) {
     state.proc.data = { ...data };
     state.proc.edited = new Set(edited);
-    state.vault.dirty = true;
     setProcessedCount(Object.keys(state.proc.data).length);
     renderProc();
     showToast('Sustitucion deshecha', 'info');
@@ -924,7 +915,6 @@ export async function applyJE() {
         processBtn().disabled = !hasContent;
         if (count > 0 && (userNameInput().value.trim() || $('sysPrompt').value.trim())) processText();
         else { updJS(); updLorebookCount(); showToast(hasContent ? 'Aplicado: ' + count + ' campo(s)' : 'Aplicado', 'info'); }
-        state.vault.dirty = true;
     } catch (err) { showToast('Error: ' + err.message, 'error'); }
 }
 
@@ -944,7 +934,6 @@ function swapAltGreeting(newIndex) {
     const un = userNameInput().value.trim() || '{{user}}';
     const processed = all[newIndex].replace(/\{\{char\}\}/gi, () => cn).replace(/\{\{user\}\}/gi, () => un);
     state.proc.data['first_mes'] = processed;
-    state.vault.dirty = true;
 
     const card = findCardByKey('first_mes');
     if (card) {
@@ -1018,7 +1007,6 @@ export function addLorebookEntry() {
         insertion_order: state.characterBook.entries.length,
         extensions: {}
     });
-    state.vault.dirty = true;
     renderLorebook();
 }
 
@@ -1027,7 +1015,6 @@ function moveLorebookEntry(index, dir) {
     const ni = index + dir;
     if (ni < 0 || ni >= entries.length) return;
     [entries[index], entries[ni]] = [entries[ni], entries[index]];
-    state.vault.dirty = true;
     renderLorebook();
 }
 
@@ -1125,7 +1112,6 @@ export function renderLorebook() {
             keysInput.addEventListener('blur', () => {
                 entry.keys = keysInput.value.split(',').map(k => k.trim()).filter(k => k);
                 keysEl.textContent = entry.keys.length > 0 ? entry.keys.join(', ') : '(sin claves)';
-                state.vault.dirty = true;
             });
             keysSection.append(kl, keysInput);
             body.append(keysSection);
@@ -1140,7 +1126,6 @@ export function renderLorebook() {
             contentEl.addEventListener('input', () => {
                 entry.content = contentEl.innerText;
                 countEl.textContent = contentEl.innerText.length + ' chars';
-                state.vault.dirty = true;
             });
         } else {
             contentEl.className = 'font-crimson text-sm text-text1 whitespace-pre-wrap leading-[1.7] min-h-[2rem]';
@@ -1165,7 +1150,6 @@ export function renderLorebook() {
             enabledBadge.textContent = entry.enabled ? 'activo' : 'inactivo';
             enabledBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson ' + (entry.enabled ? 'bg-editor/20 text-editor' : 'bg-[#3a2020] text-[#e05a5a]');
             toggleBtn.innerHTML = (entry.enabled ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>') + ' ' + (entry.enabled ? 'Desactivar' : 'Activar');
-            state.vault.dirty = true;
         });
 
         acts.append(toggleBtn);
@@ -1182,7 +1166,6 @@ export function renderLorebook() {
                 });
                 if (res !== 'ok') return;
                 state.characterBook.entries.splice(i, 1);
-                state.vault.dirty = true;
                 renderLorebook();
             });
             acts.append(delBtn);

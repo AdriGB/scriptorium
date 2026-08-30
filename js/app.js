@@ -1,6 +1,6 @@
 import state, { getExtracted } from './state.js';
 import { $, showToast, confirmDialog, closeConfirmDialog } from './utils.js';
-import { serialize, apply as applySnapshot } from './snapshot.js';
+import { serialize, apply as applySnapshot, revision, isDirty } from './snapshot.js';
 import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
 import vault from './storage.js';
@@ -167,6 +167,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderJSONSafely();
     setWorkspaceLoaded(false);
     refreshProcessHint();
+    /* Base de la huella: el estado recien arrancado no es trabajo pendiente, asi
+       que cerrar la pestana sin hacer nada no avisa. Si la boveda no llega a
+       abrir, esto es lo unico que evita el aviso falso. */
+    state.vault.savedRev = revision(state);
 
     /* ── Vault init ── */
     let dbReady = false;
@@ -197,7 +201,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                 });
                 if (choice === 'ok') {
                     await hydrateFrom(saved);
-                    state.vault.dirty = false;
+                    // Ya esta en el disco tal cual: que no se vuelva a escribir.
+                    state.vault.savedRev = revision(state);
                     showToast('Sesion recuperada');
                 } else if (choice === 'cancel') {
                     // Antes cualquier "Cancelar" borraba la sesion sin vuelta atras.
@@ -247,11 +252,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('importProfilesBundleBtn')?.addEventListener('click', () => { $('importProfilesBundleInput')?.click(); });
     $('importProfilesBundleInput')?.addEventListener('change', async (e) => { const file = e.target.files?.[0]; if (file) await importProfilesBundle(file); e.target.value = ''; });
 
-    // Config inputs mark dirty + update labels
-    charNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); });
-    userNameInput?.addEventListener('input', () => { updLP(); state.vault.dirty = true; refreshVisibleJSON(); refreshProcessHint(); });
-    sysPromptInput?.addEventListener('input', () => { state.vault.dirty = true; refreshVisibleJSON(); refreshProcessHint(); });
-    userPersonaInput?.addEventListener('input', () => { state.vault.dirty = true; });
+    // Config inputs: actualizan etiquetas y aviso. Lo de guardar se deriva solo.
+    charNameInput?.addEventListener('input', () => { updLP(); refreshVisibleJSON(); });
+    userNameInput?.addEventListener('input', () => { updLP(); refreshVisibleJSON(); refreshProcessHint(); });
+    sysPromptInput?.addEventListener('input', () => { refreshVisibleJSON(); refreshProcessHint(); });
 
     /* ── File handling ── */
     function setStatus(msg, type, html) {
@@ -347,7 +351,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.characterBook.entries = [];
         state.characterBook.present = false; state.characterBook.metadata = {};
         state.altGreetings.original = ''; state.altGreetings.list = []; state.altGreetings.current = 0;
-        state.vault.dirty = false;
         $('editorToggle')?.classList.remove('active'); $('editorToggle')?.setAttribute('aria-pressed', 'false');
         $('editorInfoBar')?.classList.add('hidden');
         uploadStatus?.classList.add('hidden');
@@ -370,11 +373,14 @@ document.addEventListener('DOMContentLoaded', async () => {
         setActiveTab('tabProcessed');
         // Sin carta, en movil el panel vuelve a abrirse: es donde se carga la siguiente.
         autoSidebarExpand();
+        /* La huella se iguala al final, con el estado ya vacio y el perfil
+           reaplicado: si no, el autosave volveria a escribir una sesion vacia
+           encima de la que se acaba de borrar. */
+        state.vault.savedRev = revision(state);
         showToast('Tomo purificado', 'success', {
             label: 'Deshacer',
             onClick: async () => {
                 await hydrateFrom(snap);
-                state.vault.dirty = true;
                 showToast('Trabajo restaurado');
             }
         });
@@ -438,7 +444,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    window.addEventListener('beforeunload', (e) => { if (!state.vault.dirty) return; e.preventDefault(); e.returnValue = ''; });
+    window.addEventListener('beforeunload', (e) => { if (!isDirty(state)) return; e.preventDefault(); e.returnValue = ''; });
     window.addEventListener('beforeunload', () => { vault.stopAutoSave(); });
 });
 
