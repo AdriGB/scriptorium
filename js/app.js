@@ -1,5 +1,6 @@
 import state, { getExtracted } from './state.js';
-import { $, showToast, deepClone, confirmDialog, closeConfirmDialog } from './utils.js';
+import { $, showToast, confirmDialog, closeConfirmDialog } from './utils.js';
+import { serialize, apply as applySnapshot } from './snapshot.js';
 import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
 import vault from './storage.js';
@@ -82,64 +83,36 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     /* ── Snapshot / restauracion ──
-       Mismo formato que la sesion del vault (storage.js saveSession), de modo que
-       la recuperacion de sesion y el "deshacer" compartan el mismo camino. */
+       El formato vive en snapshot.js y es el mismo para la sesion del vault
+       (storage.js), el "deshacer" de aqui y el bundle exportado. Antes cada uno
+       construia el suyo y ya habian divergido. */
     function snapState() {
-        return {
-            savedAt: Date.now(),
-            file: state.file.uploaded,
-            extracted: { ...state.file.extracted },
-            procData: { ...state.proc.data },
-            procEdited: [...state.proc.edited],
-            editorAdded: [...state.editor.added],
-            editorRemoved: [...state.editor.removed],
-            characterBook: deepClone(state.characterBook),
-            altGreetings: deepClone(state.altGreetings),
-            charName: charNameInput?.value || '',
-            userName: userNameInput?.value || '',
-            sysPrompt: sysPromptInput?.value || '',
-            userPersona: userPersonaInput?.value || '',
-            activeProfileId: state.profiles.active,
-            editorActive: state.editor.active,
-            fileName: $('statusFileName')?.textContent || '',
-            pngFile: state.file.pngFile || null
-        };
+        return serialize(state);
     }
 
     async function hydrateFrom(saved) {
-        state.file.uploaded = saved.file ?? null;
-        state.file.pngFile = saved.pngFile ?? null;
-        state.file.extracted = { ...(saved.extracted || {}) };
-        state.proc.data = { ...(saved.procData || {}) };
-        state.proc.edited = new Set(saved.procEdited || []);
-        state.editor.added = new Set(saved.editorAdded || []);
-        state.editor.removed = new Set(saved.editorRemoved || []);
-        state.characterBook = deepClone(saved.characterBook || { present: false, metadata: {}, entries: [] });
-        state.altGreetings = deepClone(saved.altGreetings || { original: '', list: [], current: 0 });
+        const d = applySnapshot(saved);
+        if (!d) return false;
 
-        if (saved.activeProfileId && state.profiles.lib[saved.activeProfileId]) {
-            state.profiles.active = saved.activeProfileId;
+        if (d.activeProfileId && state.profiles.lib[d.activeProfileId]) {
+            state.profiles.active = d.activeProfileId;
             renderSel();
             applyP();
         }
-
-        if (charNameInput) charNameInput.value = saved.charName ?? '';
-        if (userNameInput) userNameInput.value = saved.userName ?? '';
-        if (sysPromptInput) sysPromptInput.value = saved.sysPrompt ?? '';
-        if (userPersonaInput) userPersonaInput.value = saved.userPersona ?? '';
         updLP();
 
         const restoredCount = Object.keys(state.file.extracted).length;
         if (processBtn) processBtn.disabled = !hasCardContent(restoredCount);
         refreshProcessHint();
-        setWorkspaceLoaded(true, saved.fileName || (saved.charName ? 'Sesion: ' + saved.charName : 'Sesion recuperada'), restoredCount);
+        setWorkspaceLoaded(true, d.fileName || (d.charName ? 'Sesion: ' + d.charName : 'Sesion recuperada'), restoredCount);
         renderRaw();
         updLorebookCount();
         if (restoredCount > 0 || Object.keys(state.proc.data).length > 0 || sysPromptInput?.value.trim()) processText();
         else { renderProc(); if (state.characterBook.present) $('tabLorebook')?.click(); }
         renderJSONSafely();
-        if (saved.editorActive && !state.editor.active) togEd({ notify: false });
+        if (d.editorActive && !state.editor.active) togEd({ notify: false });
         autoSidebarCollapse();
+        return true;
     }
 
     if (!fileInput || !dropzone) { console.error('DOM critico no encontrado'); return; }

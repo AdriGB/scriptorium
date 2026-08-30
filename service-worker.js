@@ -26,6 +26,7 @@ const APP_SHELL = [
     './js/png-parser.js',
     './js/png-writer.js',
     './js/profiles.js',
+    './js/snapshot.js',
     './js/state.js',
     './js/storage.js',
     './js/translator.js',

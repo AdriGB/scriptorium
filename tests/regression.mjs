@@ -65,6 +65,54 @@ assert.equal(withoutGlobalPrompt.data.system_prompt, undefined);
 await copyAll();
 assert.doesNotMatch(clipboardText, /Prompt obsoleto/);
 
+/* ── Formato de sesion ──
+   snapshot.js es el unico sitio que define el contrato: la sesion de IndexedDB
+   (storage.js) y el "Deshacer" (app.js) tienen que hablar el mismo idioma. Si se
+   anade un campo al estado y se olvida en serialize(), el round-trip lo delata. */
+const { serialize, deserialize, apply, isLegacy, SNAPSHOT_VERSION } =
+    await import('../js/snapshot.js');
+
+state.file.extracted = { description: 'Texto', ['__proto__']: 'no', constructor: 'no' };
+state.proc.data = { personality: 'Procesado' };
+state.proc.edited = new Set(['description']);
+state.file.pngFile = { name: 'carta.png' };
+
+const snap = serialize(state);
+assert.equal(snap.version, SNAPSHOT_VERSION);
+assert.equal(snap.extracted.description, 'Texto');
+assert.ok(!Object.prototype.hasOwnProperty.call(snap.extracted, '__proto__'),
+    'Las claves reservadas no se serializan');
+assert.ok(!Object.prototype.hasOwnProperty.call(snap.extracted, 'constructor'),
+    'Las claves reservadas no se serializan');
+assert.equal(snap.pngFile.name, 'carta.png', 'El Deshacer conserva el File del PNG');
+assert.equal(serialize(state, { persist: true }).pngFile, undefined,
+    'Lo que va a IndexedDB no lleva el File: JSON.stringify lo mide como {} y la compuerta de tamaño dejaria de servir');
+
+const back = deserialize(JSON.parse(JSON.stringify(snap)));
+assert.equal(back.procData.personality, 'Procesado');
+assert.ok(back.procEdited instanceof Set && back.procEdited.has('description'),
+    'procEdited vuelve como Set, no como array');
+
+/* Sesion de 1.2.3 o anterior: no llevaba `version` ni normalizaba la forma. No
+   se tira, se rellena. */
+const normalized = deserialize({
+    savedAt: 1,
+    file: { data: { name: 'Vieja' } },
+    procData: 'no es un objeto',
+    characterBook: null,
+    altGreetings: { list: 'roto' }
+});
+assert.ok(isLegacy(normalized), 'Una sesion sin version se marca como antigua');
+assert.deepEqual(normalized.procData, {});
+assert.deepEqual(normalized.characterBook, { present: false, metadata: {}, entries: [] });
+assert.deepEqual(normalized.altGreetings, { original: '', list: [], current: 0 });
+assert.equal(normalized.fileName, '');
+
+delete state.proc.data.personality;
+apply(snap);
+assert.equal(state.proc.data.personality, 'Procesado', 'apply() vuelca la sesion en el estado');
+assert.equal(elements.get('charName').value, 'Alice', 'apply() restaura el formulario');
+
 const serviceWorkerSource = await readFile(new URL('../service-worker.js', import.meta.url), 'utf8');
 const appSource = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));

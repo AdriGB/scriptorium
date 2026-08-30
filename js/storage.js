@@ -1,3 +1,5 @@
+import { serialize } from './snapshot.js';
+
 const DB_NAME = 'scriptorium_vault';
 const DB_VERSION = 1;
 const STORES = { SESSIONS: 'sessions', CHARACTERS: 'characters', SETTINGS: 'settings' };
@@ -100,19 +102,11 @@ export class Vault {
     async saveSession(state) {
         if (!this.db) return false;
         try {
-            const snap = {
-                id: 'current', savedAt: Date.now(),
-                file: state.file.uploaded, extracted: { ...state.file.extracted },
-                procData: { ...state.proc.data }, procEdited: [...state.proc.edited],
-                editorAdded: [...state.editor.added], editorRemoved: [...state.editor.removed],
-                characterBook: structuredClone(state.characterBook),
-                altGreetings: structuredClone(state.altGreetings),
-                charName: document.getElementById('charName')?.value || '',
-                userName: document.getElementById('userName')?.value || '',
-                sysPrompt: document.getElementById('sysPrompt')?.value || '',
-                userPersona: document.getElementById('userPersona')?.value || '',
-                activeProfileId: state.profiles.active, editorActive: state.editor.active
-            };
+            /* El formato es cosa de snapshot.js: aqui solo se anade `id`, que es
+               el keyPath del store. `persist` deja fuera el File del PNG porque
+               JSON.stringify lo mide como `{}` y la compuerta de tamaño dejaria
+               de cumplir su funcion. */
+            const snap = { id: 'current', ...serialize(state, { persist: true }) };
             const size = JSON.stringify(snap).length;
             if (size > 4 * 1024 * 1024) {
                 console.warn('[Vault] sesion demasiado grande, no se guarda');
