@@ -67,12 +67,28 @@ assert.doesNotMatch(clipboardText, /Prompt obsoleto/);
 
 const serviceWorkerSource = await readFile(new URL('../service-worker.js', import.meta.url), 'utf8');
 const appSource = await readFile(new URL('../js/app.js', import.meta.url), 'utf8');
-assert.match(serviceWorkerSource, /scriptorium-v1\.2\.3/);
+const pkg = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+assert.match(
+    serviceWorkerSource,
+    new RegExp('scriptorium-v' + pkg.version.replace(/\./g, '\\.')),
+    'CACHE_VERSION del service worker no coincide con la version de package.json'
+);
 assert.match(serviceWorkerSource, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.doesNotMatch(serviceWorkerSource, /cache\.put\('\.\/index\.html'/);
 assert.match(appSource, /controllerchange/);
 assert.match(appSource, /isLocalDevelopment/);
 assert.match(appSource, /renderJSONSafely\(true\)/);
+
+/* Todos los modulos de js/ tienen que estar en el APP_SHELL: el fetch de los
+   .js es solo de red (con la cache como respaldo), asi que el que falte no
+   llega nunca al precargado y offline revienta el grafo de modulos entero.
+   Es lo que paso con field-index.js al anadirlo sin tocar el worker. */
+const precached = [...serviceWorkerSource.matchAll(/'\.\/js\/([A-Za-z0-9-]+\.js)'/g)].map(m => m[1]);
+const onDisk = (await readdir(new URL('../js/', import.meta.url))).filter(f => f.endsWith('.js'));
+assert.deepEqual(
+    onDisk.filter(f => !precached.includes(f)), [],
+    'Modulos de js/ ausentes del APP_SHELL de service-worker.js'
+);
 
 /* ── Regresiones estructurales de UX ──
    Blinda el Tier 1: dialogo tematico en lugar de los nativos, focus trap activo

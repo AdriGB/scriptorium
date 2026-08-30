@@ -1,4 +1,6 @@
-const CACHE_VERSION = 'scriptorium-v1.2.3';
+/* Debe coincidir con `version` de package.json: tests/regression.mjs lo comprueba
+   y avisa si se olvida subirlo. Cambiarlo invalida la cache de los clientes. */
+const CACHE_VERSION = 'scriptorium-v1.2.4';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 
 const APP_SHELL = [
@@ -20,6 +22,7 @@ const APP_SHELL = [
     './js/chara-card.js',
     './js/editor.js',
     './js/export.js',
+    './js/field-index.js',
     './js/png-parser.js',
     './js/png-writer.js',
     './js/profiles.js',
@@ -35,12 +38,32 @@ const APP_SHELL = [
     './icons/icon-maskable-512.png'
 ];
 
+/* Sin estos la app no arranca sin red. Lo demas (fuentes, iconos) solo la deja
+   mas fea, asi que un fallo ahi no debe impedir la instalacion. */
+const CRITICAL = new Set(
+    APP_SHELL.filter(u => u.endsWith('.js') || u === './index.html' || u === './assets/app.css')
+);
+
 self.addEventListener('install', event => {
-    event.waitUntil(
-        caches.open(APP_CACHE)
-            .then(cache => cache.addAll(APP_SHELL))
-            .then(() => self.skipWaiting())
-    );
+    event.waitUntil((async () => {
+        const cache = await caches.open(APP_CACHE);
+        /* addAll es atomico: un solo 404 tumbaba la instalacion entera y dejaba
+           al usuario sin PWA por un icono renombrado. Se anade de una en una
+           para separar lo critico de lo decorativo. */
+        const failed = [];
+        await Promise.all(APP_SHELL.map(url =>
+            cache.add(url).catch(err => {
+                failed.push(url);
+                console.warn('[SW] sin precachear:', url, err?.message || err);
+            })
+        ));
+        const critical = failed.filter(url => CRITICAL.has(url));
+        if (critical.length) {
+            // Sin skipWaiting: sigue mandando el worker anterior, que si arranca.
+            throw new Error('[SW] faltan ficheros criticos: ' + critical.join(', '));
+        }
+        await self.skipWaiting();
+    })());
 });
 
 self.addEventListener('activate', event => {

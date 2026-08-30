@@ -136,12 +136,15 @@ export class Vault {
         this._autoSaveTimer = setInterval(async () => {
             try {
                 const s = getStateFn();
-                const hasContent = s && (
-                    Object.keys(s.proc.data).length > 0 ||
-                    s.characterBook?.present ||
-                    s.altGreetings?.list?.length > 0
-                );
-                if (s && s.vault.dirty && hasContent) {
+                /* La compuerta exigia campos procesados, asi que editar el nombre
+                   de una carta recien cargada marcaba `dirty`, hacia saltar el
+                   aviso al cerrar y aun asi no se guardaba nada: prometia una red
+                   que no existia. Con carta cargada ya hay trabajo que perder. */
+                const hasWork = Boolean(s?.file?.uploaded) ||
+                    Object.keys(s?.proc?.data || {}).length > 0 ||
+                    Boolean(s?.characterBook?.present) ||
+                    (s?.altGreetings?.list?.length || 0) > 0;
+                if (s && s.vault.dirty && hasWork) {
                     const saved = await this.saveSession(s);
                     if (saved) s.vault.dirty = false;
                 }
