@@ -13,12 +13,33 @@ import { initFieldIndex } from './field-index.js';
 
 document.addEventListener('DOMContentLoaded', async () => {
 
-    try {
-        initCanvas(); initSidebar(); initTabs(); initSearch(); initAbout();
-        initExpandModal(); initAddFieldModal(); initExportModal(); initJsonEditor();
-        initConfirmModal(); initFocusTraps(); initShortcutsModal(); initWelcome();
-        initFieldIndex();
-    } catch (err) { console.error('[Init] error:', err); }
+    /* ── Red de errores ──
+       Sin esto un fallo en cualquier manejador se queda en la consola y la
+       interfaz simplemente deja de responder. El aviso se dosifica: un error
+       que se repite en cada fotograma llenaria la pantalla. */
+    let lastErrorToast = 0;
+    function reportError(where, err) {
+        console.error('[' + where + ']', err);
+        const now = Date.now();
+        if (now - lastErrorToast < 5000) return;
+        lastErrorToast = now;
+        showToast('Algo ha fallado: ' + (err?.message || 'error inesperado'), 'error');
+    }
+    window.addEventListener('error', e => reportError('error', e.error || e.message));
+    window.addEventListener('unhandledrejection', e => reportError('promesa', e.reason));
+
+    /* Cada init va por su cuenta: antes iban todos en un unico try y el primero
+       que fallaba se llevaba por delante los demas sin dejar rastro. */
+    const initSteps = {
+        canvas: initCanvas, sidebar: initSidebar, tabs: initTabs, search: initSearch,
+        about: initAbout, expandModal: initExpandModal, addFieldModal: initAddFieldModal,
+        exportModal: initExportModal, jsonEditor: initJsonEditor, confirmModal: initConfirmModal,
+        focusTraps: initFocusTraps, shortcutsModal: initShortcutsModal, welcome: initWelcome,
+        fieldIndex: initFieldIndex
+    };
+    for (const [name, step] of Object.entries(initSteps)) {
+        try { step(); } catch (err) { reportError('init:' + name, err); }
+    }
 
     const fileInput = $('dropzone-file');
     const dropzone = $('dropzone');

@@ -234,9 +234,22 @@ assert.match(editorSource, /fields:rendered/);
 assert.ok((editorSource.match(/announceRender\(\)/g) || []).length >= 4, 'Falta anunciar el repintado en alguna vista');
 
 /* ── Tier 3: UI muerta cableada ── */
-assert.match(appSourceFull, /initShortcutsModal\(\)/, 'El modal de atajos no se inicializa');
-assert.match(appSourceFull, /initWelcome\(\)/, 'El panel de bienvenida no se inicializa');
 assert.match(appSourceFull, /closeShortcuts\(\)/, 'Esc no cierra el modal de atajos');
+/* Todos los init importados tienen que estar en el mapa de arranque. Antes
+   iban en un unico try y el primero que fallaba se llevaba por delante los
+   demas sin dejar rastro; ahora cada uno va por su cuenta, pero eso no sirve
+   de nada si se olvida anadirlo a la lista. */
+const initFns = [...new Set([...appSourceFull.matchAll(/\binit[A-Z]\w+/g)].map(m => m[0]))];
+const stepsBlock = appSourceFull.slice(
+    appSourceFull.indexOf('const initSteps'),
+    appSourceFull.indexOf('for (const [name, step]')
+);
+assert.ok(stepsBlock.length > 0, 'Falta el mapa de arranque initSteps');
+for (const fn of initFns) {
+    if (fn === 'initSteps') continue;
+    assert.ok(stepsBlock.includes(fn), fn + ' no esta en el mapa de arranque');
+}
+assert.ok(initFns.length >= 14, 'Se esperaban al menos 14 pasos de arranque, hay ' + initFns.length);
 assert.match(appSourceFull, /refreshProcessHint\(\)/, 'El #processHint sigue sin usar');
 // El focus trap se resuelve por una lista de ids: el modal tiene que estar en ella.
 assert.match(uiSource, /const MODAL_IDS = \[[^\]]*'shortcutsModal'/);
