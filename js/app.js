@@ -82,6 +82,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
 
+    /* ── Pintar una carta cargada ──
+       Un solo punto de entrada para "ya hay carta en el estado, muestrala". Las
+       tres rutas repetian este bloque con pequenas variaciones y cada arreglo
+       habia que hacerlo tres veces: la de la boveda no ponia al dia el contador
+       de la pestana original y la de la sesion recuperada no recogia el panel en
+       movil. `empty` es el caso del fichero que se lee pero no trae campos. */
+    function showCard({ title, count, empty = null, notify = true, process = null, editorActive = false } = {}) {
+        const total = count ?? Object.keys(getExtracted()).length;
+        const hasContent = hasCardContent(total);
+        const rc = $('rawCount');
+        if (rc) rc.textContent = String(total);
+        if (!hasContent) { const pc = $('processedCount'); if (pc) pc.textContent = '0'; }
+
+        if (empty) {
+            const rv = $('rawView');
+            if (rv) rv.replaceChildren(emptyFieldsState(empty.icon, empty.title, empty.hint));
+            const pv = $('processedView');
+            if (pv) pv.replaceChildren(emptyFieldsState(
+                '<i class="fa-solid fa-triangle-exclamation"></i>',
+                'No se encontraron campos compatibles.',
+                'El archivo se leyo, pero no contiene campos de CharaCard v2.'
+            ));
+        } else {
+            renderRaw();
+        }
+
+        if (processBtn) processBtn.disabled = !hasContent;
+        refreshProcessHint();
+        setWorkspaceLoaded(true, title, total);
+        updLorebookCount();
+        // Sin campos pero con lorebook, la pestana que sirve es la del lorebook.
+        if (total === 0 && state.characterBook.present) $('tabLorebook')?.click();
+        else $('tabRaw')?.click();
+        renderJSONSafely(notify);
+        if (editorActive && !state.editor.active) togEd({ notify: false });
+        if (empty) { updFab(); return; }
+
+        // Ya hay carta que mirar: en movil el panel se recoge para dejarla ver.
+        autoSidebarCollapse();
+        const shouldProcess = process ?? (total > 0 && Boolean(userNameInput?.value.trim() || sysPromptInput?.value.trim()));
+        /* Sin invocar, la pestana procesada se repinta de todas formas: si no,
+           se quedaban los campos de la carta anterior despues de cargar otra. */
+        if (shouldProcess) processText(); else renderProc();
+    }
+
     /* ── Snapshot / restauracion ──
        El formato vive en snapshot.js y es el mismo para la sesion del vault
        (storage.js), el "deshacer" de aqui y el bundle exportado. Antes cada uno
@@ -102,16 +147,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         updLP();
 
         const restoredCount = Object.keys(state.file.extracted).length;
-        if (processBtn) processBtn.disabled = !hasCardContent(restoredCount);
-        refreshProcessHint();
-        setWorkspaceLoaded(true, d.fileName || (d.charName ? 'Sesion: ' + d.charName : 'Sesion recuperada'), restoredCount);
-        renderRaw();
-        updLorebookCount();
-        if (restoredCount > 0 || Object.keys(state.proc.data).length > 0 || sysPromptInput?.value.trim()) processText();
-        else { renderProc(); if (state.characterBook.present) $('tabLorebook')?.click(); }
-        renderJSONSafely();
-        if (d.editorActive && !state.editor.active) togEd({ notify: false });
-        autoSidebarCollapse();
+        showCard({
+            title: d.fileName || (d.charName ? 'Sesion: ' + d.charName : 'Sesion recuperada'),
+            count: restoredCount,
+            notify: false,
+            // Aqui si hay campos procesados basta para invocar: vienen del estado.
+            process: restoredCount > 0 ||
+                Object.keys(state.proc.data).length > 0 ||
+                Boolean(sysPromptInput?.value.trim()),
+            editorActive: d.editorActive
+        });
         return true;
     }
 
@@ -178,18 +223,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         state.file.pngFile = null; // las cartas de la boveda no conservan la imagen
         resetCardState();
         extractFields(card);
-        const count = Object.keys(getExtracted()).length;
         if (name && charNameInput) { charNameInput.value = name; updLP(); }
-        if (rawCount) rawCount.textContent = count;
-        renderRaw();
-        if (processBtn) processBtn.disabled = !hasCardContent(count);
-        refreshProcessHint();
-        setWorkspaceLoaded(true, name || 'Carta de la boveda', count);
-        updLorebookCount();
-        if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
-        else $('tabRaw')?.click();
-        renderJSONSafely(true);
-        if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
+        showCard({ title: name || 'Carta de la boveda' });
     });
 
     document.addEventListener('vault:request-card', (e) => {
@@ -254,20 +289,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         resetCardState();
         const dup = extractFields(state.file.uploaded);
         const count = Object.keys(getExtracted()).length;
-        const hasContent = hasCardContent(count);
-        if (!hasContent) {
-            processBtn.disabled = true;
-            refreshProcessHint();
-            if (rawCount) rawCount.textContent = '0';
-            const pc = $('processedCount'); if (pc) pc.textContent = '0';
-            const rv = $('rawView'); if (rv) rv.replaceChildren(emptyFieldsState('<i class="fa-solid fa-scroll"></i>', 'La plantilla no tiene campos.', ''));
-            const pv = $('processedView');
-            if (pv) pv.replaceChildren(emptyFieldsState('<i class="fa-solid fa-triangle-exclamation"></i>', 'No se encontraron campos compatibles.', 'El archivo se leyo, pero no contiene campos de CharaCard v2.'));
-            setWorkspaceLoaded(true, fn, count);
-            updLorebookCount();
-            $('tabRaw')?.click();
-            renderJSONSafely(true);
-            updFab();
+        if (!hasCardContent(count)) {
+            showCard({
+                title: fn,
+                count,
+                empty: {
+                    icon: '<i class="fa-solid fa-scroll"></i>',
+                    title: 'La plantilla no tiene campos.',
+                    hint: ''
+                }
+            });
             return setStatus('Tomo vacio: no contiene campos compatibles.', 'error');
         }
         const nm = state.file.uploaded.name || state.file.uploaded.data?.name || state.file.uploaded.char_name || '';
@@ -276,18 +307,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (state.characterBook.present) msg += ' ' + state.characterBook.entries.length + ' entrada(s) de lorebook.';
         if (dup > 0) msg += ' (' + dup + ' dup. resueltos)';
         setStatus(msg, 'success');
-        if (rawCount) rawCount.textContent = count;
-        renderRaw();
-        if (processBtn) processBtn.disabled = !hasContent;
-        refreshProcessHint();
-        setWorkspaceLoaded(true, fn, count);
-        updLorebookCount();
-        if (count === 0 && state.characterBook.present) $('tabLorebook')?.click();
-        else $('tabRaw')?.click();
-        renderJSONSafely(true);
-        // Ya hay carta que mirar: en movil el panel se recoge para dejarla ver.
-        autoSidebarCollapse();
-        if (count > 0 && (userNameInput?.value.trim() || sysPromptInput?.value.trim())) processText();
+        showCard({ title: fn, count });
     }
 
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });

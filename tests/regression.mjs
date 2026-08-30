@@ -125,7 +125,18 @@ assert.match(serviceWorkerSource, /fetch\(request, \{ cache: 'no-store' \}\)/);
 assert.doesNotMatch(serviceWorkerSource, /cache\.put\('\.\/index\.html'/);
 assert.match(appSource, /controllerchange/);
 assert.match(appSource, /isLocalDevelopment/);
-assert.match(appSource, /renderJSONSafely\(true\)/);
+/* Cargar una carta tiene que avisar si la vista JSON falla: showCard recibe el
+   flag y se lo pasa. Antes era un `renderJSONSafely(true)` literal en cada ruta. */
+assert.match(appSource, /renderJSONSafely\(notify\)/);
+/* Pintar una carta pasa por un solo sitio. Con tres rutas pintando por su
+   cuenta cada arreglo habia que repetirlo tres veces, y de hecho se habian
+   desincronizado (la boveda no actualizaba el contador de la pestana original
+   y la sesion recuperada no recogia el panel en movil). */
+assert.match(appSource, /function showCard\(/);
+assert.equal(
+    [...appSource.matchAll(/[^.\w]renderRaw\(/g)].length, 1,
+    'app.js debe llamar a renderRaw() una sola vez, dentro de showCard()'
+);
 
 /* Todos los modulos de js/ tienen que estar en el APP_SHELL: el fetch de los
    .js es solo de red (con la cache como respaldo), asi que el que falte no
