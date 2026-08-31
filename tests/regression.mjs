@@ -135,6 +135,66 @@ const revBefore = revision(state);
 await new Promise(r => setTimeout(r, 5));
 assert.equal(revision(state), revBefore, 'savedAt no entra en la huella: cambia en cada serialize');
 
+/* ── Lectura de PNG ──
+   `extPNG` es la unica entrada de cartas en la app y no tenia ni un test: era la
+   pieza mas grande sin cubrir. Los PNG se construyen aqui mismo
+   (tests/png-fixture.mjs) en vez de versionar un binario, y se le pasan al modulo
+   real, que corre en Node porque File, atob y DecompressionStream son globales
+   desde Node 18. */
+/* El `atob` de Node es "indulgente": acepta base64url y separadores. El de los
+   navegadores es estricto y lanza InvalidCharacterError. Como el modulo corre en
+   el navegador, el test tiene que usar esa semantica: si no, un payload
+   base64url daria verde aqui y reventaria alla, que es exactamente el bug que
+   se arreglo en png-parser.js. Se restaura al acabar la seccion. */
+const nodeAtob = globalThis.atob;
+globalThis.atob = (s) => {
+    if (/[^A-Za-z0-9+/=]/.test(s) || s.length % 4 !== 0) {
+        throw new Error('InvalidCharacterError');
+    }
+    return nodeAtob(s);
+};
+
+const { extPNG } = await import(new URL('../js/png-parser.js', import.meta.url));
+const { tEXtBase64, tEXtJson, tEXtRaw, zTXt, iTXt, plainPng, toFile, sampleCard } =
+    await import(new URL('./png-fixture.mjs', import.meta.url));
+
+const pngCard = sampleCard();
+/* Sin + ni / en el base64, la variante base64url sale identica a la normal y el
+   caso pasa sin probar nada — me paso en la primera version de este test: el
+   base64 de la carta no tenia ninguno de los dos y el assert de base64url daba
+   verde incluso con el arreglo del parser quitado. Si alguien toca la carta de
+   prueba y dejan de aparecer, esto lo dice en vez de callarse. */
+const pngB64 = Buffer.from(JSON.stringify(pngCard), 'utf8').toString('base64');
+assert.ok(/[+/]/.test(pngB64), 'La carta de prueba debe producir + o / en base64: si no, el caso base64url no prueba nada');
+
+/* Cinco formas de incrustar la misma carta: son las que escriben las herramientas
+   de verdad. Un fallo aqui es una carta que el usuario no puede abrir, y no hay
+   forma de enterarse salvo probandolo. */
+for (const [name, bytes] of [
+    ['tEXt base64', tEXtBase64(pngCard)],
+    ['tEXt base64url sin padding', tEXtBase64(pngCard, { url: true })],
+    ['tEXt con JSON en claro', tEXtJson(pngCard)],
+    ['zTXt comprimido', zTXt(pngCard)],
+    ['iTXt sin comprimir', iTXt(pngCard)]
+]) {
+    const read = await extPNG(toFile(bytes));
+    assert.deepEqual(read, pngCard, name + ': la carta no vuelve intacta');
+}
+
+// Un PNG normal: es lo que pasa si se arrastra una imagen que no es una carta.
+await assert.rejects(() => extPNG(toFile(plainPng())), /Sin metadatos/);
+// Un tEXt que no se llama chara no es una carta, pero tampoco un error de lectura.
+await assert.rejects(() => extPNG(toFile(tEXtRaw('Comment', 'una nota'))), /Sin metadatos/);
+await assert.rejects(() => extPNG(toFile(Buffer.from('esto no es un png'))), /PNG invalido/);
+await assert.rejects(() => extPNG(toFile(Buffer.alloc(0))), /vacio/);
+/* Payload roto: se encontro el chunk pero no se puede decodificar. El mensaje
+   tiene que distinguirlo de "no habia carta", si no el usuario busca en el
+   sitio equivocado. */
+await assert.rejects(() => extPNG(toFile(tEXtRaw('chara', 'no es json ni base64'))),
+    /no se pudo decodificar|no es JSON/);
+
+globalThis.atob = nodeAtob;
+
 /* ── Logica pura del buscador de la boveda ──
    Se importa el modulo real en vez de replicar la funcion: fue justo aqui donde
    se colo un `${excerpt}` sin definir que reventaba al pintar la lista. */
