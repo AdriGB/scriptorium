@@ -31,11 +31,35 @@ export const isValidKey = (nk, cur) => {
     return /^[a-z][a-z0-9_]*$/.test(nk);
 };
 
+/* Clonar no admite "mas o menos": el `{}` que se devolvia al fallar no era un
+   clon, era perder datos con forma de exito. `snapshot.js` clona aqui el
+   lorebook y los saludos alternativos, asi que una carta que no se pudiera
+   clonar se guardaba sin ellos **por encima de la sesion buena**: al recargar,
+   el lorebook habia desaparecido y no habia forma de saber por que.
+
+   Ahora el fallo se propaga. En `saveSession` el throw ocurre al serializar,
+   antes del `dbPut`, asi que la sesion anterior sigue intacta en el disco: se
+   pierde un guardado, no el trabajo. Y en la exportacion aborta antes de
+   escribir una carta vacia.
+
+   Los primitivos (incluidas las funciones) se devuelven tal cual: son
+   inmutables, no hay nada que clonar, y `structuredClone` lanzaria por ellas
+   sin motivo. */
 export const deepClone = (obj) => {
-    try { return structuredClone(obj); }
-    catch {
-        try { return JSON.parse(JSON.stringify(obj)); }
-        catch { return {}; }
+    if (obj === null || typeof obj !== 'object') return obj;
+    try {
+        return structuredClone(obj);
+    } catch (err) {
+        // Puede contener funciones, proxies o nodos del DOM.
+        console.warn('[deepClone] structuredClone fallo, se intenta por JSON', err);
+    }
+    try {
+        /* Degradacion, no equivalencia: JSON se come las funciones, convierte
+           las fechas en cadena y vacia Map y Set. Solo se llega aqui con
+           objetos que structuredClone ya rechazo, y se avisa por consola. */
+        return JSON.parse(JSON.stringify(obj));
+    } catch (err) {
+        throw new Error('deepClone: el valor no se puede clonar (' + (err?.message || 'sin detalle') + ')');
     }
 };
 

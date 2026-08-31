@@ -221,7 +221,7 @@ assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
    Helpers puros que alimentan la barra de estado y las insignias. El caso que
    importa es el del nombre vacio: la sustitucion no llega, la carta se exporta
    con las llaves puestas y antes la app decia "Ritual completado". */
-const { textStats, statsLabel, countMarkers, HEAVY_CARD } = await import(new URL('../js/utils.js', import.meta.url));
+const { textStats, statsLabel, countMarkers, deepClone, HEAVY_CARD } = await import(new URL('../js/utils.js', import.meta.url));
 
 assert.deepEqual(textStats(''), { chars: 0, words: 0, tokens: 0 });
 assert.deepEqual(textStats('   '), { chars: 3, words: 0, tokens: 1 });
@@ -245,6 +245,65 @@ assert.equal(countMarkers('{{Char}} {{char}}'), 2);
 assert.equal(countMarkers('{{personaje}} {{char }}'), 0, 'Solo cuentan los marcadores exactos');
 assert.equal(countMarkers(''), 0);
 assert.equal(countMarkers(null), 0);
+
+/* ── deepClone ──
+   Devuelve el valor o falla. Nada de `{}`: un clon que se rinde en silencio es
+   una perdida de datos con forma de exito, y es justo lo que pasaba con el
+   lorebook al guardar la sesion. */
+const original = { a: 1, b: { c: [1, 2, { d: 'fondo' }] } };
+const copy = deepClone(original);
+assert.deepEqual(copy, original);
+copy.b.c[2].d = 'cambiado';
+assert.equal(original.b.c[2].d, 'fondo', 'El clon no comparte referencias con el original');
+
+/* Referencias circulares, Map, Set y Date: son los cuatro casos que un
+   `JSON.parse(JSON.stringify())` no puede ni de lejos. Si algun dia se cambia
+   structuredClone por JSON a secas, salta por aqui. */
+const circ = { nombre: 'raiz' };
+circ.self = circ;
+const circCopy = deepClone(circ);
+assert.equal(circCopy.self, circCopy, 'El clon conserva el ciclo apuntandose a si mismo');
+assert.equal(circCopy.self.self.nombre, 'raiz');
+
+const rich = { m: new Map([['k', 1]]), s: new Set([1, 2]), d: new Date(0) };
+const richCopy = deepClone(rich);
+assert.ok(richCopy.m instanceof Map && richCopy.m.get('k') === 1, 'Map se pierde por el camino');
+assert.ok(richCopy.s instanceof Set && richCopy.s.has(2), 'Set se pierde por el camino');
+assert.ok(richCopy.d instanceof Date && richCopy.d.getTime() === 0, 'Date degrada a cadena');
+
+// Los primitivos pasan tal cual: son inmutables y no hay nada que clonar.
+assert.equal(deepClone('texto'), 'texto');
+assert.equal(deepClone(7), 7);
+assert.equal(deepClone(null), null);
+assert.equal(deepClone(undefined), undefined);
+const fn = () => {};
+assert.equal(deepClone(fn), fn, 'Una funcion se devuelve tal cual, no se lanza por ella');
+
+/* Un valor que no admite ni un camino ni el otro tiene que fallar. Antes
+   devolvia `{}` y con eso se sobrescribia la sesion buena: al recargar, el
+   lorebook habia desaparecido sin que nada avisara. */
+const unclonable = new Proxy({}, {
+    ownKeys() { throw new Error('inaccesible'); },
+    get() { throw new Error('inaccesible'); }
+});
+/* El aviso de degradacion salta a proposito en estos dos casos, y una traza
+   completa por ejecucion no le dice nada a nadie. Se silencia solo aqui y se
+   devuelve enseguida: un aviso inesperado tiene que seguir viendose. */
+const warnDeVerdad = console.warn;
+console.warn = () => {};
+assert.throws(() => deepClone(unclonable), /no se puede clonar/);
+
+/* El caso que importa de verdad: si el lorebook no se puede clonar, `serialize`
+   tiene que fallar ANTES de escribir. `saveSession` la llama en la linea previa
+   al `dbPut`, asi que abortar deja la sesion anterior intacta en el disco en vez
+   de reemplazarla por una sin lorebook. */
+const bookAntes = state.characterBook;
+state.characterBook = { present: true, metadata: { name: 'Mundo' }, entries: [], extensions: unclonable };
+assert.throws(() => serialize(state), /no se puede clonar/,
+    'Un lorebook inclonable se guardaria vacio en vez de fallar el guardado');
+state.characterBook = bookAntes;
+console.warn = warnDeVerdad;
+assert.doesNotThrow(() => serialize(state), 'El estado se queda como estaba');
 
 /* ── Indice de la scrollbar ──
    Funcion pura que reparte las marcas por el rail. Es donde se cuelan los dos
