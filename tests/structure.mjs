@@ -69,13 +69,22 @@ assert.deepEqual(
 
 let nativeConfirms = 0;
 let trapFocusCalls = 0;
+const escapeDefs = [];
 for (const file of jsFiles) {
     const src = await readFile(new URL(file, jsDir), 'utf8');
     // Cuenta solo `confirm(` suelto: excluye window.confirm (fallback deliberado)
     // y no confunde con confirmDialog( / closeConfirmDialog(.
     nativeConfirms += (src.match(/(?<![\w.])confirm\(/g) || []).length;
     trapFocusCalls += (src.match(/trapFocus\(/g) || []).length;
+    /* Escape HTML: hubo tres copias (dos `esc` locales en editor.js y una
+       `escapeHtml` en vault.js) y **solo una escapaba comillas**. En contenido
+       da igual, pero en el atributo de una etiqueta —que es como se interpola el
+       nombre de personaje en los botones de la boveda— sin comillas se sale del
+       atributo. Una sola definicion, y es la completa. */
+    if (/function escapeHtml|const escapeHtml\s*=|const esc\s*=/.test(src)) escapeDefs.push(file);
 }
+assert.deepEqual(escapeDefs, ['utils.js'],
+    'El escape HTML se define una sola vez, en utils.js (hoja, y ya la importan editor.js y vault.js)');
 assert.equal(nativeConfirms, 0, 'Quedan dialogos nativos sin migrar a confirmDialog');
 // El import muerto de trapFocus estuvo en el repo sin que nadie lo llamara.
 assert.ok(trapFocusCalls >= 2, 'trapFocus debe declararse e invocarse');

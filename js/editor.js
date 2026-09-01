@@ -1,5 +1,5 @@
 import state, { VF, getExtracted, RESERVED_KEYS } from './state.js';
-import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog, textStats, statsLabel, countMarkers, HEAVY_FIELD, HEAVY_CARD } from './utils.js';
+import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog, textStats, statsLabel, countMarkers, escapeHtml, HEAVY_FIELD, HEAVY_CARD } from './utils.js';
 import { extractFields, buildExp, findCardByKey } from './chara-card.js';
 import { trText, checkTranslationPrivacy } from './translator.js';
 
@@ -288,8 +288,7 @@ export function createCard(key, text, isRaw, animate = true) {
     const ce = document.createElement('div');
     if (isRaw) {
         ce.className = 'font-crimson text-[0.95rem] text-text2 whitespace-pre-wrap leading-[1.7]';
-        const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        ce.innerHTML = esc(text).replace(/\{\{char\}\}/gi, '<span class="tag-char">{{char}}</span>').replace(/\{\{user\}\}/gi, '<span class="tag-user">{{user}}</span>');
+        ce.innerHTML = escapeHtml(text).replace(/\{\{char\}\}/gi, '<span class="tag-char">{{char}}</span>').replace(/\{\{user\}\}/gi, '<span class="tag-user">{{user}}</span>');
     } else {
         ce.className = 'font-crimson text-base text-text1 whitespace-pre-wrap leading-[1.7] outline-none border border-transparent rounded-lg p-2 -mx-2 transition-colors hover:bg-surface2 focus:bg-[#14162a] focus:border-border2 min-h-[2rem]';
         ce.contentEditable = 'true'; ce.textContent = text;
@@ -411,13 +410,12 @@ function announceRender() {
 export function emptyFieldsState(glyphHtml, title, hint) {
     // glyphHtml va tal cual (es marcado); el texto se escapa por si alguna vez
     // llega de la propia carta en lugar de ser un literal.
-    const esc = (s) => String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
     const box = document.createElement('div');
     box.className = 'fields-empty-state flex flex-col items-center justify-center min-h-[40vh] text-center px-4 py-10';
     box.innerHTML =
         '<div class="mb-4 text-text3 opacity-20 ' + (glyphHtml.startsWith('&#') ? 'text-5xl font-cinzelDeco' : 'text-3xl') + '">' + glyphHtml + '</div>' +
-        '<p class="text-text3 italic max-w-sm text-sm">' + esc(title) + '</p>' +
-        (hint ? '<p class="text-text3/60 text-xs mt-2">' + esc(hint) + '</p>' : '');
+        '<p class="text-text3 italic max-w-sm text-sm">' + escapeHtml(title) + '</p>' +
+        (hint ? '<p class="text-text3/60 text-xs mt-2">' + escapeHtml(hint) + '</p>' : '');
     return box;
 }
 

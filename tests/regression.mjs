@@ -221,7 +221,30 @@ assert.ok(buildExcerpt(richChar, 'zzz').endsWith('…'));
    Helpers puros que alimentan la barra de estado y las insignias. El caso que
    importa es el del nombre vacio: la sustitucion no llega, la carta se exporta
    con las llaves puestas y antes la app decia "Ritual completado". */
-const { textStats, statsLabel, countMarkers, deepClone, HEAVY_CARD } = await import(new URL('../js/utils.js', import.meta.url));
+const { textStats, statsLabel, countMarkers, deepClone, escapeHtml, HEAVY_CARD } =
+    await import(new URL('../js/utils.js', import.meta.url));
+
+/* ── Escape HTML ──
+   Vivia triplicado: dos `esc` locales en editor.js y este en vault.js, y solo
+   el de vault.js escapaba comillas. Hoy las tres versiones se usan en sitios
+   donde llegan, pero dos de ellas son una inyeccion esperando sitio: basta con
+   que alguien las reutilice en un atributo —que es exactamente como se
+   interpola el nombre de personaje en los botones de la boveda— para que un
+   nombre con comillas se salga del atributo. */
+assert.equal(escapeHtml('a & b'), 'a &amp; b');
+assert.equal(escapeHtml('<b>x</b>'), '&lt;b&gt;x&lt;/b&gt;');
+/* Las comillas son las que faltaban en las dos copias de editor.js: sin ellas,
+   `Ada" onmouseover="...` dentro de un title="..." cierra el atributo y mete el
+   suyo. El `&` va primero en la cadena de reemplazos, si no lo que se acaba de
+   escapar se volveria a escapar. */
+assert.equal(escapeHtml('Ada" onmouseover="x'), 'Ada&quot; onmouseover=&quot;x');
+assert.equal(escapeHtml("it's"), 'it&#39;s');
+assert.equal(escapeHtml('&amp;'), '&amp;amp;', 'El & ya escapado se vuelve a escapar: es lo correcto');
+// No revienta con lo que no es texto, que es lo que llegaria de una carta rara.
+assert.equal(escapeHtml(null), '');
+assert.equal(escapeHtml(undefined), '');
+assert.equal(escapeHtml(0), '0');
+assert.equal(escapeHtml(42), '42');
 
 assert.deepEqual(textStats(''), { chars: 0, words: 0, tokens: 0 });
 assert.deepEqual(textStats('   '), { chars: 3, words: 0, tokens: 1 });

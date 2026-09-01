@@ -1,19 +1,7 @@
 import vault from './storage.js';
-import { confirmDialog } from './utils.js';
+import { confirmDialog, escapeHtml } from './utils.js';
 
 const $ = (id) => document.getElementById(id);
-
-/* Escape sin DOM (antes usaba document.createElement): ademas de permitir importar
-   el modulo en Node para los tests, escapa comillas, que hacian falta en los
-   aria-label donde se interpolan nombres de personaje. */
-function escapeHtml(s) {
-    return String(s == null ? '' : s)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
 
 function countCardFields(card) {
     let c = 0;

@@ -18,6 +18,25 @@ export function activeFieldView() {
     return $('lorebookView');
 }
 
+/* Escape para interpolar texto en HTML. Sin DOM (ni `createElement` ni `textContent`),
+   para poder importarlo en Node desde los tests.
+
+   Escapa tambien las comillas, no solo `& < >`: en el atributo de una etiqueta
+   (`title="..."`, `aria-label="..."`) solo con `& < >` no basta, porque un
+   nombre de personaje con comillas se saldria del atributo y meteria marcado
+   propio. Es justo como se interpola el nombre en los botones de la boveda,
+   asi que una version que no las escape es una inyeccion esperando sitio.
+
+   Se usa tanto en posicion de contenido como de atributo: en contenido las
+   comillas no hacen dana, y en atributo son imprescindibles. Una sola funcion
+   para las dos evita tener que acordarse de cual hacia falta en cada sitio. */
+export const escapeHtml = (s) => String(s == null ? '' : s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
 export const sanitizeKey = (raw) => {
     if (!raw || typeof raw !== 'string') return '';
     return raw.trim().toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').slice(0, 64).replace(/^_+|_+$/g, '');
