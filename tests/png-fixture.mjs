@@ -108,6 +108,34 @@ export function plainPng() {
 export const toFile = (bytes, name = 'carta.png') =>
     new File([bytes], name, { type: 'image/png' });
 
+/* Recorre los chunks de un PNG comprobando el CRC de cada uno. Un chunk con el
+   CRC mal es una **carta muerta**: el PNG abre en un visor indulgente, pero un
+   lector estricto descarta el chunk entero y la carta desaparece sin avisar.
+   Es el fallo que no se ve hasta que alguien reimporta la imagen. */
+export function walkChunks(bytes) {
+    const out = [];
+    if (bytes.length < 8) return out;
+    let off = 8;
+    while (off + 12 <= bytes.length) {
+        const len = bytes.readUInt32BE(off);
+        const type = bytes.toString('latin1', off + 4, off + 8);
+        const data = bytes.subarray(off + 8, off + 8 + len);
+        const stored = bytes.readUInt32BE(off + 8 + len);
+        const computed = crc32(Buffer.concat([Buffer.from(type, 'latin1'), data]));
+        out.push({ type, data, crcOk: stored === computed });
+        if (type === 'IEND') break;
+        off += 12 + len;
+    }
+    return out;
+}
+
+/** Los chunks de texto que llevan la carta (keyword `chara`). */
+export function charaChunks(bytes) {
+    return walkChunks(bytes)
+        .filter(c => ['tEXt', 'zTXt', 'iTXt'].includes(c.type))
+        .filter(c => c.data.toString('latin1').split('\0')[0] === 'chara');
+}
+
 /** Una carta v2 completa, con lorebook y saludos alternativos. */
 export const sampleCard = () => ({
     spec: 'chara_card_v2',

@@ -195,6 +195,63 @@ await assert.rejects(() => extPNG(toFile(tEXtRaw('chara', 'no es json ni base64'
 
 globalThis.atob = nodeAtob;
 
+/* ── Escritura de PNG ──
+   El parser estaba cubierto y el writer no, y es el lado que puede **matar una
+   carta**: un chunk mal escrito no da error, simplemente la carta no vuelve a
+   salir. El round-trip se hace con el parser real, no con un clon de la
+   logica de lectura. */
+const { injectCharaToPng, encodeCharaPayload } = await import(new URL('../js/png-writer.js', import.meta.url));
+const { walkChunks, charaChunks } = await import(new URL('./png-fixture.mjs', import.meta.url));
+
+const inject = async (card, base = plainPng()) =>
+    Buffer.from(await (await injectCharaToPng(toFile(base), card)).arrayBuffer());
+
+const written = await inject(pngCard);
+assert.deepEqual(await extPNG(toFile(written)), pngCard, 'round-trip: escribir y volver a leer');
+
+/* El clasico de `btoa`: revienta con cualquier caracter por encima de 255, asi
+   que un nombre con acentos o en japones se pierde por el camino. El writer
+   pasa por TextEncoder precisamente por esto. */
+const acentuada = { ...pngCard, data: { ...pngCard.data, name: 'Ada Lovelace — アダ — ñ' } };
+assert.deepEqual(await extPNG(toFile(await inject(acentuada))), acentuada, 'acentos y kanji');
+assert.equal(typeof encodeCharaPayload(pngCard), 'string');
+
+/* Escribir sobre una carta que ya traia la suya: se **reemplaza**, no se anade.
+   Con dos chunks `chara` mandaria el primero, que es el viejo, y el usuario
+   guardaria cambios que no se ven por ningun sitio. */
+for (const [name, base] of [
+    ['tEXt', tEXtBase64(sampleCard())],
+    ['zTXt', zTXt(sampleCard())],
+    ['iTXt', iTXt(sampleCard())]
+]) {
+    const otra = { ...pngCard, data: { ...pngCard.data, name: 'Otra carta' } };
+    const out = await inject(otra, base);
+    assert.equal(charaChunks(out).length, 1, name + ' viejo: debe quedar un solo chunk chara');
+    assert.deepEqual(await extPNG(toFile(out)), otra, name + ' viejo: manda el nuevo, no el viejo');
+}
+/* Dos escrituras seguidas: el writer tiene que quitar el chunk que el mismo
+   acaba de poner, no apilarlos. */
+const twice = await inject(pngCard, written);
+assert.equal(charaChunks(twice).length, 1, 'Reescribir no apila chunks');
+
+/* Cada chunk con su CRC bien. Es lo que hace que un lector estricto no descarte
+   el chunk entero: el PNG abre igual en un visor indulgente, pero la carta se
+   ha ido. */
+for (const [i, c] of walkChunks(written).entries()) {
+    assert.ok(c.crcOk, 'El chunk ' + i + ' (' + c.type + ') tiene el CRC mal');
+}
+
+// La imagen se conserva: IDAT intacto y el PNG sigue bien formado.
+assert.deepEqual(walkChunks(written).map(c => c.type), ['IHDR', 'IDAT', 'tEXt', 'IEND']);
+assert.deepEqual(
+    walkChunks(written).find(c => c.type === 'IDAT').data,
+    walkChunks(plainPng()).find(c => c.type === 'IDAT').data,
+    'Los pixeles no se tocan al inyectar la carta'
+);
+
+await assert.rejects(() => injectCharaToPng(toFile(Buffer.from('esto no es un png')), pngCard),
+    /No es PNG/);
+
 /* ── Logica pura del buscador de la boveda ──
    Se importa el modulo real en vez de replicar la funcion: fue justo aqui donde
    se colo un `${excerpt}` sin definir que reventaba al pintar la lista. */

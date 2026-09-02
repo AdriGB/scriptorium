@@ -2,7 +2,7 @@
 
 **Scriptorium** es una herramienta web liviana, moderna y sin dependencias pesadas diseñada para la edición, formateo y gestión de tarjetas de personajes de IA (*CharaCardV2*) e historias RPG.
 
-![Versión](https://img.shields.io/badge/version-1.2.3-gold)
+![Versión](https://img.shields.io/badge/version-1.2.4-gold)
 ![Licencia](https://img.shields.io/badge/license-MIT-blue)
 
 👉 **[Usar Scriptorium en vivo](https://adrigb.github.io/scriptorium/)**

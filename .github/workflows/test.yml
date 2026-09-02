@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# La suite no toca la red ni escribe nada: son asserts sobre modulos importados
+# de verdad y sobre el codigo como texto. Corre en ~1s, asi que no hace falta
+# cache de dependencias.
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Tests de comportamiento
+        run: node ./tests/regression.mjs
+
+      - name: Tests estructurales
+        run: node ./tests/structure.mjs
+
+      # El grafo de modulos: si un import apunta a un fichero que no existe,
+      # los tests unitarios no se enteran porque solo importan modulos sueltos.
+      - name: El bundle resuelve
+        run: npx esbuild ./js/app.js --bundle --format=esm --outfile=/tmp/check.js
