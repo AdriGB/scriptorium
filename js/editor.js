@@ -1,5 +1,5 @@
 import state, { VF, getExtracted, RESERVED_KEYS } from './state.js';
-import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog, textStats, statsLabel, countMarkers, escapeHtml, HEAVY_FIELD, HEAVY_CARD } from './utils.js';
+import { $, deepClone, showToast, copyClip, sanitizeKey, isValidKey, confirmDialog, textStats, statsLabel, countMarkers, detectBrokenMacros, activeFieldView, escapeHtml, HEAVY_FIELD, HEAVY_CARD } from './utils.js';
 import { extractFields, buildExp, findCardByKey } from './chara-card.js';
 import { trText, checkTranslationPrivacy } from './translator.js';
 
@@ -174,13 +174,21 @@ export function resetCardState() {
     state.altGreetings.current = 0;
 }
 
-/* Insignia de peso: los chars a la vista y el detalle al pasar por encima, para
-   no ensanchar la cabecera de la tarjeta. En oro a partir del umbral. */
+/* Insignia de peso: tokens estimados y caracteres a la vista. En oro a partir del umbral. */
 function setCardStats(cc, text) {
     const { chars, tokens } = textStats(text);
-    cc.textContent = chars.toLocaleString('es') + ' chars';
+    cc.textContent = `~${tokens.toLocaleString('es')} tok · ${chars.toLocaleString('es')} car`;
     cc.title = statsLabel(text) + (tokens >= HEAVY_FIELD ? ' — campo muy pesado' : '');
     cc.classList.toggle('text-gold', tokens >= HEAVY_FIELD);
+}
+
+/* Avisa de macros rotas como {char}} o variables tipo $char */
+function setCardBroken(brk, text) {
+    const issues = detectBrokenMacros(text);
+    brk.classList.toggle('hidden', issues.length === 0);
+    if (issues.length > 0) {
+        brk.title = 'Posible sintaxis de macro invalida: ' + issues.join('; ');
+    }
 }
 
 /* Marcadores que quedaron literales en un campo ya procesado. */
@@ -261,7 +269,11 @@ export function createCard(key, text, isRaw, animate = true) {
     const mk = document.createElement('span');
     mk.className = 'marker-badge hidden shrink-0 text-[0.55rem] px-1.5 py-0.5 rounded font-crimson italic bg-[#3a2900] text-[#e8cc80] border border-[#7a6230]/30';
     mk.textContent = 'sin sustituir';
-    head.append(tEl, cc, ed, tg);
+    const brk = document.createElement('span');
+    brk.className = 'broken-badge hidden shrink-0 text-[0.55rem] px-1.5 py-0.5 rounded font-crimson italic bg-[#3a1a1a] text-[#f08080] border border-[#602020]';
+    brk.innerHTML = '<i class="fa-solid fa-triangle-exclamation mr-1"></i>macro rota';
+    setCardBroken(brk, text);
+    head.append(tEl, cc, ed, brk, tg);
     if (!isRaw) { head.insertBefore(mk, tg); setCardMarkers(mk, text); }
 
     const body = document.createElement('div'); body.className = 'field-card-body px-5 py-4'; body.style.overflow = 'hidden';
@@ -294,9 +306,11 @@ export function createCard(key, text, isRaw, animate = true) {
         ce.contentEditable = 'true'; ce.textContent = text;
     }
 
+    body.appendChild(ce);
+
     let tC = null, tA = null;
-    const tB = document.createElement('div'); tB.className = 'hidden mt-3 pt-3 border-t border-dashed border-violetDim/50';
-    const tH = document.createElement('div'); tH.className = 'flex items-center gap-2 mb-1.5';
+    const tB = document.createElement('div'); tB.className = 'hidden mt-4 pt-3 border-t border-dashed border-violetDim/50';
+    const tH = document.createElement('div'); tH.className = 'flex items-center gap-2 mb-2';
     const tL = document.createElement('p'); tL.className = 'text-[0.6rem] font-cinzel tracking-widest uppercase text-violet2 flex-1';
     tL.innerHTML = '<i class="fa-solid fa-language"></i> Traduccion';
     const tX = document.createElement('div'); tX.className = 'font-crimson text-base text-text2 italic whitespace-pre-wrap leading-[1.7]';
@@ -306,6 +320,7 @@ export function createCard(key, text, isRaw, animate = true) {
         state.proc.data[key] = e.target.innerText;
         setCardStats(cc, e.target.innerText);
         setCardMarkers(mk, e.target.innerText);
+        setCardBroken(brk, e.target.innerText);
         scheduleWeight();
         state.proc.edited.add(key);
         ed.classList.remove('hidden');
@@ -358,7 +373,11 @@ export function createCard(key, text, isRaw, animate = true) {
     }
 
     const cB = mkB('<i class="fa-regular fa-copy"></i>', 'Copiar');
-    cB.addEventListener('click', () => copyClip(isRaw ? text : (state.proc.data[key] ?? ce.innerText)));
+    cB.addEventListener('click', async () => {
+        const src = isRaw ? text : (state.proc.data[key] ?? ce.innerText);
+        const ok = await copyClip(src);
+        showToast(ok ? 'Campo copiado' : 'No se pudo copiar', ok ? 'success' : 'error');
+    });
 
     if (!isRaw) {
         if (state.editor.added.has(key)) {
@@ -400,10 +419,69 @@ export function refreshCardBadges() {
     });
 }
 
+export function toggleCollapseAll() {
+    const view = activeFieldView();
+    if (!view) return;
+    const cards = [...view.querySelectorAll('.field-card')].filter(c => c.style.display !== 'none');
+    if (!cards.length) return;
+
+    const anyExpanded = cards.some(c => !c.classList.contains('collapsed'));
+    const shouldCollapse = anyExpanded;
+
+    const isRaw = view.id === 'rawView';
+    const isLb = view.id === 'lorebookView';
+
+    cards.forEach((card, i) => {
+        const key = card.dataset.key;
+        const collapseKey = isLb ? (LB_PFX + i) : ((isRaw ? RAW_PFX : '') + (key || ''));
+        const head = card.querySelector('.field-card-head');
+        const body = card.querySelector('.field-card-body');
+
+        if (shouldCollapse) {
+            state.proc.collapsed.add(collapseKey);
+            card.classList.add('collapsed');
+            if (head) head.setAttribute('aria-expanded', 'false');
+            if (body) body.style.maxHeight = '0px';
+        } else {
+            state.proc.collapsed.delete(collapseKey);
+            card.classList.remove('collapsed');
+            if (head) head.setAttribute('aria-expanded', 'true');
+            if (body) body.style.maxHeight = 'none';
+        }
+    });
+
+    updateCollapseAllBtn(shouldCollapse);
+    document.dispatchEvent(new CustomEvent('fields:rendered'));
+}
+
+export function updateCollapseAllBtn(isCollapsed = null) {
+    const btn = $('toggleCollapseAllBtn');
+    const icon = $('toggleCollapseAllIcon');
+    const label = $('toggleCollapseAllLabel');
+    if (!btn || !icon || !label) return;
+
+    if (isCollapsed === null) {
+        const view = activeFieldView();
+        const cards = view ? [...view.querySelectorAll('.field-card')].filter(c => c.style.display !== 'none') : [];
+        isCollapsed = cards.length > 0 && cards.every(c => c.classList.contains('collapsed'));
+    }
+
+    if (isCollapsed) {
+        icon.className = 'fa-solid fa-chevron-down text-[0.65rem] transition-transform duration-300';
+        label.textContent = 'Desplegar todo';
+        btn.title = 'Desplegar todas las tarjetas';
+    } else {
+        icon.className = 'fa-solid fa-chevron-up text-[0.65rem] transition-transform duration-300';
+        label.textContent = 'Plegar todo';
+        btn.title = 'Plegar todas las tarjetas';
+    }
+}
+
 /* ─── Empty states ───
    Avisa al modulo de busqueda (ui.js) de que el arbol se ha repintado, para que
    reaplique el filtro. Se hace por evento para no crear el ciclo editor <-> ui. */
 function announceRender() {
+    updateCollapseAllBtn();
     document.dispatchEvent(new CustomEvent('fields:rendered'));
 }
 
@@ -1103,9 +1181,11 @@ export function renderLorebook() {
         enabledBadge.textContent = entry.enabled ? 'activo' : 'inactivo';
         badgesContainer.appendChild(enabledBadge);
 
+        const { chars: lbChars, tokens: lbTokens } = textStats(entry.content);
         const countEl = document.createElement('span');
         countEl.className = 'text-[0.6rem] text-text3 font-crimson italic';
-        countEl.textContent = entry.content.length + ' chars';
+        countEl.textContent = `~${lbTokens.toLocaleString('es')} tok · ${lbChars.toLocaleString('es')} car`;
+        countEl.title = statsLabel(entry.content);
 
         const arrow = document.createElement('i');
         arrow.className = 'fa-solid fa-chevron-down text-text3 text-[0.7rem] transition-transform duration-300';
@@ -1226,7 +1306,9 @@ export function renderLorebook() {
             contentEl.textContent = entry.content;
             contentEl.addEventListener('input', () => {
                 entry.content = contentEl.innerText;
-                countEl.textContent = contentEl.innerText.length + ' chars';
+                const { chars: nc, tokens: nt } = textStats(contentEl.innerText);
+                countEl.textContent = `~${nt.toLocaleString('es')} tok · ${nc.toLocaleString('es')} car`;
+                countEl.title = statsLabel(contentEl.innerText);
             });
         } else {
             contentEl.className = 'font-crimson text-sm text-text1 whitespace-pre-wrap leading-[1.7] min-h-[2rem]';
@@ -1245,6 +1327,12 @@ export function renderLorebook() {
             return b;
         };
 
+        const copyLoreBtn = mkB('<i class="fa-regular fa-copy"></i>', 'Copiar');
+        copyLoreBtn.addEventListener('click', async () => {
+            const ok = await copyClip(entry.content);
+            showToast(ok ? 'Entrada copiada' : 'No se pudo copiar', ok ? 'success' : 'error');
+        });
+
         const toggleBtn = mkB(entry.enabled ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>', entry.enabled ? 'Desactivar' : 'Activar');
         toggleBtn.addEventListener('click', () => {
             entry.enabled = !entry.enabled;
@@ -1253,7 +1341,7 @@ export function renderLorebook() {
             toggleBtn.innerHTML = (entry.enabled ? '<i class="fa-solid fa-eye-slash"></i>' : '<i class="fa-solid fa-eye"></i>') + ' ' + (entry.enabled ? 'Desactivar' : 'Activar');
         });
 
-        acts.append(toggleBtn);
+        acts.append(copyLoreBtn, toggleBtn);
 
         if (state.editor.active) {
             const delBtn = mkB('<i class="fa-solid fa-trash-can"></i>', 'Eliminar', 'hover:text-[#e05a5a] hover:border-[#502020]');

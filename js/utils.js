@@ -128,6 +128,23 @@ export function countMarkers(text) {
     return (String(text ?? '').match(/\{\{(?:char|user)\}\}/gi) || []).length;
 }
 
+/* Detecta macros mal formadas o con sintaxis invalida:
+   {char}}, {{char}, $char o $user. Evita fallos silenciosos en SillyTavern. */
+export function detectBrokenMacros(text) {
+    if (!text || typeof text !== 'string') return [];
+    const issues = [];
+    if (/(?:^|[^{])\{(?:\s*(?:char|user)\s*\}\})/i.test(text)) {
+        issues.push('{char}} o {user}} (falta una llave de apertura)');
+    }
+    if (/(\{\{\s*(?:char|user)\s*\})(?:[^}]|$)/i.test(text)) {
+        issues.push('{{char} o {{user} (falta una llave de cierre)');
+    }
+    if (/\$(?:\{)?\s*(?:char|user)\s*(?:\})?/i.test(text)) {
+        issues.push('$char o ' + '$' + '{char} (formato no soportado por SillyTavern)');
+    }
+    return issues;
+}
+
 export function setNestedValue(obj, path, value) {
     if (!obj || typeof obj !== 'object') throw new Error('Objeto invalido');
     const parts = path.split('.');

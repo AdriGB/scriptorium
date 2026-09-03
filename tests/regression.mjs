@@ -739,6 +739,71 @@ toastActionEl.onclick();
 assert.equal(actionTriggered, true, 'La accion debe haberse ejecutado');
 assert.equal(toastEl.style.pointerEvents, 'none', 'Al descartarse debe volver a pointer-events none');
 
+/* ── Deteccion de macros rotas ── */
+const { detectBrokenMacros } = await import('../js/utils.js');
+assert.equal(detectBrokenMacros('Hola {{char}}, bienvenido').length, 0, 'Macros correctas no deben dar error');
+assert.ok(detectBrokenMacros('Hola {char}}, error').length > 0, 'Debe detectar falta de llave apertura');
+assert.ok(detectBrokenMacros('Hola {{user}, error').length > 0, 'Debe detectar falta de llave cierre');
+const dollarSample = 'Hola ' + '$' + '{char}, error';
+assert.ok(detectBrokenMacros(dollarSample).length > 0, 'Debe detectar formato dolar');
+
+/* ── Plegar y desplegar todo ── */
+const cardMock1 = {
+    dataset: { key: 'name' },
+    style: { display: '' },
+    classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+    },
+    querySelector() { return { setAttribute() {}, style: {} }; }
+};
+const cardMock2 = {
+    dataset: { key: 'description' },
+    style: { display: '' },
+    classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+    },
+    querySelector() { return { setAttribute() {}, style: {} }; }
+};
+const procViewMock = {
+    id: 'processedView',
+    classList: { contains(c) { return false; } },
+    querySelectorAll(selector) {
+        if (selector === '.field-card') return [cardMock1, cardMock2];
+        return [];
+    }
+};
+elements.set('processedView', procViewMock);
+elements.set('rawView', { classList: { contains() { return true; } } });
+elements.set('lorebookView', { classList: { contains() { return true; } } });
+elements.set('toggleCollapseAllBtn', { title: '' });
+elements.set('toggleCollapseAllIcon', { className: '' });
+elements.set('toggleCollapseAllLabel', { textContent: '' });
+
+if (!globalThis.CustomEvent) {
+    globalThis.CustomEvent = class { constructor(type) { this.type = type; } };
+}
+if (!globalThis.document.dispatchEvent) {
+    globalThis.document.dispatchEvent = () => true;
+}
+
+const { toggleCollapseAll } = await import('../js/editor.js');
+
+// Ambas tarjetas arrancan expandidas -> toggleCollapseAll debe plegarlas
+toggleCollapseAll();
+assert.equal(cardMock1.classList.contains('collapsed'), true, 'Debe plegar card 1');
+assert.equal(cardMock2.classList.contains('collapsed'), true, 'Debe plegar card 2');
+
+// Ahora ambas están plegadas -> toggleCollapseAll debe desplegarlas
+toggleCollapseAll();
+assert.equal(cardMock1.classList.contains('collapsed'), false, 'Debe desplegar card 1');
+assert.equal(cardMock2.classList.contains('collapsed'), false, 'Debe desplegar card 2');
+
 console.log('Regresiones funcionales: OK');
 
 

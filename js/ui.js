@@ -1,6 +1,6 @@
 import state, { STORAGE_KEYS } from './state.js';
 import { $, Storage, showToast, trapFocus, closeConfirmDialog, activeFieldView } from './utils.js';
-import { renderJSON, updJS, applyJE, updFab, renderLorebook, setJsonMode } from './editor.js';
+import { renderJSON, updJS, applyJE, updFab, renderLorebook, setJsonMode, toggleCollapseAll, updateCollapseAllBtn } from './editor.js';
 import { refreshFieldIndex } from './field-index.js';
 
 /* ─── Canvas ─── */
@@ -127,12 +127,14 @@ export function setActiveTab(id) {
     // cuando no hay busqueda activa, que es justo cuando no llega otro aviso.
     refreshFieldIndex();
     updFab();
+    updateCollapseAllBtn();
 }
 
 export function initTabs() {
     document.querySelectorAll('.tab-btn').forEach(tab =>
         tab.addEventListener('click', e => setActiveTab(e.currentTarget.id))
     );
+    $('toggleCollapseAllBtn')?.addEventListener('click', toggleCollapseAll);
 }
 
 /* ─── Search ─── */
@@ -196,10 +198,23 @@ export function initSearch() {
         let nr = v.querySelector('.no-results-state');
         if (q && vc === 0 && v.querySelector('.field-card')) {
             if (!nr) {
-                nr = document.createElement('div'); nr.className = 'no-results-state flex flex-col items-center justify-center text-center px-4 py-16';
-                const i = document.createElement('i'); i.className = 'fa-solid fa-feather-pointed text-2xl text-text3 opacity-40 mb-3';
-                const p = document.createElement('p'); p.className = 'text-text3 italic text-sm';
-                nr.append(i, p); v.appendChild(nr);
+                nr = document.createElement('div');
+                nr.className = 'no-results-state flex flex-col items-center justify-center text-center px-4 py-16 animate-fade-in-up';
+                const i = document.createElement('i');
+                i.className = 'fa-solid fa-magnifying-glass text-3xl text-goldDim opacity-40 mb-3';
+                const p = document.createElement('p');
+                p.className = 'text-text3 italic text-sm mb-4';
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'font-cinzel text-[0.62rem] tracking-wider uppercase text-gold border border-goldDim/60 hover:bg-goldDim/15 rounded-lg px-4 py-2 transition-all cursor-pointer';
+                btn.textContent = 'Limpiar búsqueda (Esc)';
+                btn.addEventListener('click', () => {
+                    searchInput.value = '';
+                    runSearch();
+                    searchInput.focus();
+                });
+                nr.append(i, p, btn);
+                v.appendChild(nr);
             }
             nr.querySelector('p').textContent = 'Sin resultados para "' + q + '"';
         } else if (nr) nr.remove();
@@ -239,6 +254,14 @@ export function initSearch() {
     }
 
     searchInput.addEventListener('input', runSearch);
+
+    searchInput.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && searchInput.value) {
+            e.stopPropagation();
+            searchInput.value = '';
+            runSearch();
+        }
+    });
 
     searchClearBtn.addEventListener('click', () => {
         searchInput.value = '';
