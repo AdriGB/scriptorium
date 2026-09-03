@@ -3,7 +3,7 @@ import { $, showToast, confirmDialog, closeConfirmDialog } from './utils.js';
 import { serialize, apply as applySnapshot, revision, isDirty } from './snapshot.js';
 import { extractFields, buildExp } from './chara-card.js';
 import { extPNG } from './png-parser.js';
-import vault from './storage.js';
+import vault, { asPortraitFile } from './storage.js';
 import { openVault, saveCurrentToVault } from './vault.js';
 import { loadProfiles, saveCurP, newPrf, delCurP, chgP, saveD, updLbl, rstDel, applyP, renderSel, exportCurrentProfile, importProfileFile, exportAllProfiles, importProfilesBundle } from './profiles.js';
 import { processText, renderRaw, renderProc, renderJSON, updFab, togEd, resetCardState, updLP, closeExp, closeAddF, updLorebookCount, updateWeight, emptyFieldsState } from './editor.js';
@@ -243,10 +243,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     /* ── Vault events ── */
     document.addEventListener('vault:load-card', (e) => {
-        const { card, name } = e.detail || {};
+        const { card, name, portrait, portraitName } = e.detail || {};
         if (!card) return;
         state.file.uploaded = card;
-        state.file.pngFile = null; // las cartas de la boveda no conservan la imagen
+        /* El retrato viaja aparte del JSON: IndexedDB si lo clona, el bundle lo
+           pasa a base64. Sin esto, cargar de la boveda dejaba pngFile a null y
+           reexportar PNG pedia otra vez la imagen. */
+        state.file.pngFile = asPortraitFile(portrait, portraitName || ((name || 'carta') + '.png'));
         resetCardState();
         extractFields(card);
         if (name && charNameInput) { charNameInput.value = name; updLP(); }
@@ -254,7 +257,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
 
     document.addEventListener('vault:request-card', (e) => {
-        try { e.detail.card = buildExp(); }
+        try {
+            e.detail.card = buildExp();
+            e.detail.portrait = state.file.pngFile || null;
+        }
         catch (err) { console.error('[vault:request-card] error', err); showToast('Error al preparar carta', 'error'); }
     });
 

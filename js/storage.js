@@ -5,6 +5,10 @@ const DB_VERSION = 1;
 const STORES = { SESSIONS: 'sessions', CHARACTERS: 'characters', SETTINGS: 'settings' };
 const AUTO_SAVE_MS = 30_000;
 const MAX_CHARACTERS = 500;
+export const MAX_PORTRAIT_BYTES = 8 * 1024 * 1024;
+const BUNDLE_FORMAT = 'scriptorium_vault';
+const BUNDLE_VERSION = 2;
+const MAX_BUNDLE_BYTES = 50 * 1024 * 1024;
 
 function openDB() {
     return new Promise((resolve, reject) => {
@@ -87,6 +91,59 @@ function genId() {
     return crypto.randomUUID?.() || Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
 }
 
+/* ── Retrato (PNG de la carta) ──
+   IndexedDB clona Blobs; JSON no. La sesion sigue sin llevar el File (snapshot.js
+   ya lo deja fuera con persist:true). El personaje de la boveda si: sin el PNG
+   no hay reexport, que es la moneda de este ecosistema. El bundle .scriptorium
+   va por JSON, asi que ahi se pasa a base64 y al importar se vuelve a File. */
+
+export function isPortraitBlob(value) {
+    return value instanceof Blob && value.size > 0 && value.size <= MAX_PORTRAIT_BYTES;
+}
+
+export function asPortraitFile(blob, name = 'carta.png') {
+    if (!isPortraitBlob(blob)) return null;
+    if (blob instanceof File) return blob;
+    const type = blob.type || 'image/png';
+    const fileName = (typeof name === 'string' && name.trim()) ? name.trim() : 'carta.png';
+    return new File([blob], fileName, { type });
+}
+
+function bytesToB64(bytes) {
+    let binary = '';
+    const step = 0x8000;
+    for (let i = 0; i < bytes.length; i += step) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + step));
+    }
+    return btoa(binary);
+}
+
+export async function portraitToBundle(blob) {
+    if (!isPortraitBlob(blob)) return null;
+    const buf = await blob.arrayBuffer();
+    if (buf.byteLength > MAX_PORTRAIT_BYTES) return null;
+    return {
+        b64: bytesToB64(new Uint8Array(buf)),
+        name: blob instanceof File && blob.name ? blob.name : 'carta.png',
+        type: blob.type || 'image/png'
+    };
+}
+
+export function portraitFromBundle(entry, fallbackName = 'carta.png') {
+    if (!entry || typeof entry !== 'object' || typeof entry.b64 !== 'string' || !entry.b64) return null;
+    try {
+        const binary = atob(entry.b64);
+        if (!binary.length || binary.length > MAX_PORTRAIT_BYTES) return null;
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+        const type = typeof entry.type === 'string' && entry.type ? entry.type : 'image/png';
+        const name = typeof entry.name === 'string' && entry.name.trim() ? entry.name.trim() : fallbackName;
+        return new File([bytes], name, { type });
+    } catch {
+        return null;
+    }
+}
+
 export class Vault {
     constructor() { this.db = null; this._autoSaveTimer = null; this._listeners = new Map(); }
 
@@ -144,7 +201,7 @@ export class Vault {
     }
     stopAutoSave() { if (this._autoSaveTimer) { clearInterval(this._autoSaveTimer); this._autoSaveTimer = null; } }
 
-    async saveCharacter({ card, name, charName }) {
+    async saveCharacter({ card, name, charName, portrait } = {}) {
         if (!this.db) throw new Error('BD no disponible');
         if (!card || typeof card !== 'object') throw new Error('Carta invalida');
         const all = await this.getAllCharacters();
@@ -154,10 +211,22 @@ export class Vault {
         const existing = all.find(c => c.name === nm);
         if (!existing && all.length >= MAX_CHARACTERS) throw new Error(`Boveda llena (${MAX_CHARACTERS} max)`);
 
+        /* Sin retrato nuevo se conserva el que ya habia: cargar un JSON encima
+           de un PNG no debe borrar la cara. Si el nuevo no cabe, tampoco. */
+        let storedPortrait = existing?.portrait && isPortraitBlob(existing.portrait) ? existing.portrait : null;
+        let storedName = typeof existing?.portraitName === 'string' && existing.portraitName
+            ? existing.portraitName : 'carta.png';
+        if (isPortraitBlob(portrait)) {
+            storedPortrait = portrait;
+            storedName = portrait instanceof File && portrait.name ? portrait.name : storedName;
+        }
+
         const record = {
             id: existing?.id || genId(), name: nm,
             card: JSON.parse(JSON.stringify(card)),
-            savedAt: Date.now(), version: existing ? (existing.version || 0) + 1 : 1
+            savedAt: Date.now(), version: existing ? (existing.version || 0) + 1 : 1,
+            portrait: storedPortrait,
+            portraitName: storedName
         };
         await dbPut(this.db, STORES.CHARACTERS, record);
         this._emit('character-saved', record);
@@ -180,7 +249,22 @@ export class Vault {
 
     async downloadBundle(filename) {
         const characters = await this.getAllCharacters();
-        const bundle = { _format: 'scriptorium_vault', _version: 1, exportedAt: new Date().toISOString(), characterCount: characters.length, characters };
+        const exported = [];
+        for (const char of characters) {
+            const { portrait, ...rest } = char;
+            const packed = { ...rest };
+            delete packed.portrait;
+            const encoded = await portraitToBundle(portrait);
+            if (encoded) packed.portraitB64 = encoded;
+            exported.push(packed);
+        }
+        const bundle = {
+            _format: BUNDLE_FORMAT,
+            _version: BUNDLE_VERSION,
+            exportedAt: new Date().toISOString(),
+            characterCount: exported.length,
+            characters: exported
+        };
         const session = await this.loadSession();
         if (session) bundle.lastSession = session;
         const json = JSON.stringify(bundle, null, 2);
@@ -190,16 +274,16 @@ export class Vault {
         a.download = filename || `scriptorium_vault_${new Date().toISOString().slice(0, 10)}.scriptorium`;
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         setTimeout(() => URL.revokeObjectURL(url), 1000);
-        return characters.length;
+        return exported.length;
     }
 
     async importBundleFromFile(file) {
         if (!file) throw new Error('Sin archivo');
-        if (file.size > 20 * 1024 * 1024) throw new Error('Bundle muy grande (max 20MB)');
+        if (file.size > MAX_BUNDLE_BYTES) throw new Error('Bundle muy grande (max 50MB)');
         const text = await file.text();
         let bundle;
         try { bundle = JSON.parse(text); } catch { throw new Error('JSON no valido'); }
-        if (bundle._format !== 'scriptorium_vault') throw new Error('Formato no reconocido - se esperaba scriptorium_vault');
+        if (bundle._format !== BUNDLE_FORMAT) throw new Error('Formato no reconocido - se esperaba scriptorium_vault');
         if (!Array.isArray(bundle.characters)) throw new Error('Sin personajes en bundle');
 
         // FIX: verificar limite durante importacion
@@ -220,7 +304,16 @@ export class Vault {
                     break;
                 }
                 if (!char.name) char.name = 'Importado';
-                await dbPut(this.db, STORES.CHARACTERS, char);
+                const record = { ...char };
+                const fromBundle = portraitFromBundle(record.portraitB64, record.portraitName || record.name || 'carta.png');
+                delete record.portraitB64;
+                if (fromBundle) {
+                    record.portrait = fromBundle;
+                    record.portraitName = fromBundle.name;
+                } else if (!isPortraitBlob(record.portrait)) {
+                    delete record.portrait;
+                }
+                await dbPut(this.db, STORES.CHARACTERS, record);
                 imported++;
                 if (!existing) currentCount++;
             } catch (e) { console.warn('import char skip', e); }

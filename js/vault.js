@@ -25,6 +25,24 @@ let _injected = false;
 let _chars = [];
 /** Termino de busqueda normalizado (minusculas, sin espacios extremos). Vacio = sin filtro. */
 let _query = '';
+/** Object URLs de los retratos pintados. Se revocan al repintar o al cerrar. */
+let _portraitUrls = [];
+
+function revokePortraits() {
+    for (const u of _portraitUrls) URL.revokeObjectURL(u);
+    _portraitUrls = [];
+}
+
+function portraitSrc(char) {
+    if (!(char?.portrait instanceof Blob)) return '';
+    try {
+        const u = URL.createObjectURL(char.portrait);
+        _portraitUrls.push(u);
+        return u;
+    } catch {
+        return '';
+    }
+}
 
 /* Exportadas para tests/regression.mjs: importarlas evita replicar aqui la logica. */
 
@@ -172,7 +190,12 @@ export async function saveCurrentToVault() {
             return false;
         }
         const charName = document.getElementById('charName')?.value?.trim() || 'Sin nombre';
-        await vault.saveCharacter({ card: ev.detail.card, name: charName, charName });
+        await vault.saveCharacter({
+            card: ev.detail.card,
+            name: charName,
+            charName,
+            portrait: ev.detail.portrait || null
+        });
         if ($('vaultModal')) await renderList();
         const { showToast } = await import('./utils.js');
         showToast(`"${charName}" guardado en boveda`);
@@ -203,6 +226,7 @@ async function renderList() {
 function paintList() {
     const list = $('vaultList'), countEl = $('vaultCount');
     if (!list) return;
+    revokePortraits();
 
     const visible = _query
         ? _chars.filter(c => searchBlob(c).toLowerCase().includes(_query))
@@ -233,32 +257,55 @@ function paintList() {
             const timeStr = d.toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
             const fc = countCardFields(char.card);
             const excerpt = highlight(buildExcerpt(char, _query), _query);
+            const src = portraitSrc(char);
+            const avatar = src
+                ? `<img src="${src}" alt="" width="36" height="36" class="w-9 h-9 rounded-full object-cover border border-goldDim/40 shrink-0">`
+                : `<div class="w-9 h-9 rounded-full bg-[radial-gradient(circle_at_50%_60%,rgba(201,168,76,0.15)_0%,transparent_70%)] border border-goldDim/40 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-pen text-goldDim text-xs"></i></div>`;
+            const hasPng = char.portrait instanceof Blob;
             card.innerHTML = `
-                <div class="w-9 h-9 rounded-full bg-[radial-gradient(circle_at_50%_60%,rgba(201,168,76,0.15)_0%,transparent_70%)] border border-goldDim/40 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-pen text-goldDim text-xs"></i></div>
+                ${avatar}
                 <div class="flex-1 min-w-0">
                     <div class="font-cinzel text-[0.72rem] tracking-wider uppercase text-text1 truncate">${highlight(char.name, _query)}</div>
-                    <div class="text-[0.6rem] text-text3 font-crimson italic mt-0.5">${fc} campo${fc !== 1 ? 's' : ''} · v${char.version || 1} · ${dateStr} ${timeStr}</div>
+                    <div class="text-[0.6rem] text-text3 font-crimson italic mt-0.5">${fc} campo${fc !== 1 ? 's' : ''} · v${char.version || 1} · ${dateStr} ${timeStr}${hasPng ? ' · PNG' : ''}</div>
                     ${excerpt ? `<div class="text-[0.62rem] text-text3 font-crimson mt-1 line-clamp-2">${excerpt}</div>` : ''}
                 </div>
                 <div class="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                     <button class="vault-load-btn w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-gold hover:bg-surface transition-all" title="Cargar" aria-label="Cargar ${escapeHtml(char.name)}"><i class="fa-solid fa-arrow-up-from-bracket text-xs"></i></button>
-                    <button class="vault-export-btn w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-editor hover:bg-surface transition-all" title="Descargar" aria-label="Descargar ${escapeHtml(char.name)}"><i class="fa-solid fa-download text-xs"></i></button>
+                    <button class="vault-export-btn w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-editor hover:bg-surface transition-all" title="${hasPng ? 'Descargar PNG' : 'Descargar JSON'}" aria-label="Descargar ${escapeHtml(char.name)}"><i class="fa-solid fa-download text-xs"></i></button>
                     <button class="vault-delete-btn w-7 h-7 rounded flex items-center justify-center text-text3 hover:text-[#e05a5a] hover:bg-surface transition-all" title="Eliminar" aria-label="Eliminar ${escapeHtml(char.name)}"><i class="fa-solid fa-trash-can text-xs"></i></button>
                 </div>`;
 
             card.querySelector('.vault-load-btn')?.addEventListener('click', () => {
-                document.dispatchEvent(new CustomEvent('vault:load-card', { detail: { card: char.card, name: char.name } }));
+                document.dispatchEvent(new CustomEvent('vault:load-card', {
+                    detail: {
+                        card: char.card,
+                        name: char.name,
+                        portrait: char.portrait || null,
+                        portraitName: char.portraitName || ''
+                    }
+                }));
                 closeVault();
             });
 
-            card.querySelector('.vault-export-btn')?.addEventListener('click', () => {
+            card.querySelector('.vault-export-btn')?.addEventListener('click', async () => {
                 try {
-                    const json = JSON.stringify(char.card, null, 2);
-                    const blob = new Blob([json], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a'); a.href = url;
-                    a.download = (char.name || 'personaje').replace(/[^a-z0-9_\-]/gi, '_') + '_card.json';
-                    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    const safe = (char.name || 'personaje').replace(/[^a-z0-9_\-]/gi, '_');
+                    if (char.portrait instanceof Blob) {
+                        const { injectCharaToPng } = await import('./png-writer.js');
+                        const blob = await injectCharaToPng(char.portrait, char.card);
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url;
+                        a.download = safe + '_card.png';
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                        setTimeout(() => URL.revokeObjectURL(url), 1000);
+                    } else {
+                        const json = JSON.stringify(char.card, null, 2);
+                        const blob = new Blob([json], { type: 'application/json' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a'); a.href = url;
+                        a.download = safe + '_card.json';
+                        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+                    }
                 } catch (e) { console.error(e); }
             });
 
@@ -303,4 +350,5 @@ export function closeVault() {
     if (!modal) return;
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    revokePortraits();
 }

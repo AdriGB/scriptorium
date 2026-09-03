@@ -574,4 +574,58 @@ assert.deepEqual(computeTicks([], 1000, RAIL), [], 'Sin campos no hay marcas');
 assert.deepEqual(computeTicks(tickSets[0][1], 0, RAIL), [], 'Sin contenido no hay marcas');
 assert.deepEqual(computeTicks(tickSets[0][1], 1000, 0), [], 'Rail sin alto no pinta marcas');
 
+/* ── Retrato de la boveda ──
+   IndexedDB clona Blobs; JSON.stringify no. El PNG de la carta tiene que
+   sobrevivir al round-trip del bundle (.scriptorium) y volver como File, que
+   es lo que injectCharaToPng espera. Si se pierde aqui, cargar de la boveda
+   deja pngFile a null y reexportar pide otra vez la imagen. */
+const {
+    isPortraitBlob, asPortraitFile, portraitToBundle, portraitFromBundle, MAX_PORTRAIT_BYTES
+} = await import(new URL('../js/storage.js', import.meta.url));
+
+const portraitFile = toFile(plainPng(), 'ada.png');
+
+assert.equal(isPortraitBlob(portraitFile), true);
+assert.equal(isPortraitBlob(null), false);
+assert.equal(isPortraitBlob({}), false);
+assert.equal(isPortraitBlob(new Blob([])), false, 'Un blob vacio no es un retrato');
+assert.equal(asPortraitFile(null), null);
+assert.ok(asPortraitFile(portraitFile) instanceof File);
+assert.equal(asPortraitFile(portraitFile).name, 'ada.png');
+const wrapped = asPortraitFile(new Blob([portraitFile], { type: 'image/png' }), 'vuelta.png');
+assert.ok(wrapped instanceof File);
+assert.equal(wrapped.name, 'vuelta.png');
+
+const packed = await portraitToBundle(portraitFile);
+assert.ok(packed && packed.b64, 'El bundle tiene que llevar el PNG en base64');
+assert.equal(packed.name, 'ada.png');
+assert.match(packed.type, /png/i);
+const restored = portraitFromBundle(packed);
+assert.ok(restored instanceof File, 'Al importar tiene que volver un File, no un string');
+assert.equal(restored.size, portraitFile.size, 'El PNG no puede cambiar de tamano en el viaje');
+assert.deepEqual(
+    new Uint8Array(await restored.arrayBuffer()),
+    new Uint8Array(await portraitFile.arrayBuffer()),
+    'Los bytes del retrato tienen que volver intactos'
+);
+
+assert.equal(portraitFromBundle(null), null);
+assert.equal(portraitFromBundle({ b64: 'no-es-base64!!!' }), null);
+assert.equal(await portraitToBundle(null), null);
+assert.equal(await portraitToBundle(new Blob([])), null);
+
+const tooBig = new Blob([new Uint8Array(MAX_PORTRAIT_BYTES + 1)], { type: 'image/png' });
+assert.equal(isPortraitBlob(tooBig), false, 'Por encima del tope no se guarda: llenaria IndexedDB');
+assert.equal(await portraitToBundle(tooBig), null);
+
+/* JSON.stringify de un Blob da {} — justo el fallo que dejaba el retrato
+   mudo en el bundle si se serializaba el record tal cual. */
+assert.equal(JSON.stringify({ portrait: portraitFile }), '{"portrait":{}}');
+const exportedRecord = { name: 'Ada', card: { spec: 'chara_card_v2' } };
+const encoded = await portraitToBundle(portraitFile);
+exportedRecord.portraitB64 = encoded;
+const viaJson = JSON.parse(JSON.stringify(exportedRecord));
+assert.ok(viaJson.portraitB64.b64.length > 8);
+assert.equal(portraitFromBundle(viaJson.portraitB64).size, portraitFile.size);
+
 console.log('Regresiones funcionales: OK');

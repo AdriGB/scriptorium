@@ -386,4 +386,23 @@ assert.match(togEdBody[0], /\{ notify = true \} = \{\}/, 'togEd debe poder calla
 assert.match(togEdBody[0], /notify && state\.editor\.active/, 'Apagar el editor avisa de algo que el boton ya esta diciendo');
 assert.match(appSource, /togEd\(\{ notify: false \}\)/, 'Restaurar la sesion avisa de un editor que nadie acaba de activar');
 
+/* ── Retrato en la boveda ──
+   Cargar de la boveda asignaba pngFile = null a proposito. El retrato ahora
+   viaja en el evento y se restaura; si alguien vuelve a tirarlo, reexportar
+   PNG pide otra vez la imagen. */
+const storageSource = await readFile(new URL('../js/storage.js', import.meta.url), 'utf8');
+assert.match(storageSource, /portraitToBundle/, 'El bundle tiene que serializar el retrato: JSON.stringify de un Blob da {}');
+assert.match(storageSource, /portraitFromBundle/, 'Al importar el bundle el retrato tiene que volver a File');
+assert.match(storageSource, /MAX_PORTRAIT_BYTES/, 'Sin tope el PNG llenaria IndexedDB');
+assert.match(storageSource, /portrait/, 'saveCharacter tiene que aceptar el retrato');
+assert.match(vaultSource, /portrait: ev\.detail\.portrait/, 'Guardar actual no pide el retrato');
+assert.match(vaultSource, /portrait: char\.portrait/, 'Cargar no despacha el retrato');
+assert.match(appSource, /asPortraitFile\(portrait/, 'Al cargar de la boveda hay que restaurar pngFile');
+assert.match(appSource, /e\.detail\.portrait = state\.file\.pngFile/, 'Al guardar, la carta sale sin el PNG');
+const loadCardBody = appSource.match(/vault:load-card[\s\S]*?showCard\(\{ title: name/);
+assert.ok(loadCardBody, 'No se encuentra el manejador de vault:load-card');
+assert.doesNotMatch(loadCardBody[0], /pngFile = null/,
+    'Cargar de la boveda volvio a tirar el retrato');
+
 console.log('Regresiones estructurales: OK');
+

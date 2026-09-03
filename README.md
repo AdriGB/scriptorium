@@ -2,7 +2,7 @@
 
 **Scriptorium** es una herramienta web liviana, moderna y sin dependencias pesadas diseñada para la edición, formateo y gestión de tarjetas de personajes de IA (*CharaCardV2*) e historias RPG.
 
-![Versión](https://img.shields.io/badge/version-1.2.4-gold)
+![Versión](https://img.shields.io/badge/version-1.3.0-gold)
 ![Licencia](https://img.shields.io/badge/license-MIT-blue)
 
 👉 **[Usar Scriptorium en vivo](https://adrigb.github.io/scriptorium/)**
@@ -18,7 +18,7 @@
 * **Sustitución en Tiempo Real:** Reemplazo dinámico e interactivo de etiquetas de sistema como `{{char}}` y `{{user}}`.
 * **Aislamiento de Metadatos:** Gestión de campos personalizados mediante el namespace `extensions.scriptorium` dentro de `data` (según la especificación V2), con versionado explícito de esquema (`version: 1`), evitando mezclar notas humanas con datos estructurados.
 * **Compatibilidad hacia atrás:** Capacidad de lectura y extracción de esquemas y formatos legados (incluyendo `extensions` en la raíz) sin romper tarjetas antiguas. Migración automática al formato correcto al exportar.
-* **Bóveda de Personajes:** Almacenamiento persistente en IndexedDB con guardado automático, exportación e importación de bundles (`.scriptorium`), límite de 500 personajes y actualización por nombre.
+* **Bóveda de Personajes:** Almacenamiento persistente en IndexedDB con el retrato PNG de cada carta (miniatura, reexportación y bundles `.scriptorium`), guardado automático, límite de 500 personajes y actualización por nombre.
 * **Recuperación de Sesión:** Al recargar la página, ofrece restaurar la última sesión guardada incluyendo perfil activo, campos procesados, lorebook, saludos alternativos y nombres de personaje/usuario.
 * **Manejo de Perfiles:** Creación, guardado y alternancia de perfiles de aventurero y prompts del sistema en almacenamiento local (*LocalStorage*).
 * **Modo Editor Interactivo:** Renombrado, reordenado, adición y eliminación de campos personalizados en vivo con confirmación de doble clic.

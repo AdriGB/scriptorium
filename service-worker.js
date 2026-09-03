@@ -1,6 +1,6 @@
 /* Debe coincidir con `version` de package.json: tests/regression.mjs lo comprueba
    y avisa si se olvida subirlo. Cambiarlo invalida la cache de los clientes. */
-const CACHE_VERSION = 'scriptorium-v1.2.4';
+const CACHE_VERSION = 'scriptorium-v1.3.0';
 const APP_CACHE = `${CACHE_VERSION}-app`;
 
 const APP_SHELL = [
