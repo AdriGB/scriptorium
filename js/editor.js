@@ -1000,6 +1000,10 @@ export function addLorebookEntry() {
     state.characterBook.present = true;
     state.characterBook.entries.push({
         keys: [],
+        secondary_keys: [],
+        selective: false,
+        constant: false,
+        position: 'before_char',
         content: '',
         enabled: true,
         insertion_order: state.characterBook.entries.length,
@@ -1061,9 +1065,39 @@ export function renderLorebook() {
         keysEl.className = 'font-cinzel text-[0.65rem] tracking-wider uppercase text-editor flex-1 truncate';
         keysEl.textContent = entry.keys.length > 0 ? entry.keys.join(', ') : '(sin claves)';
 
+        const badgesContainer = document.createElement('div');
+        badgesContainer.className = 'flex items-center gap-1.5 shrink-0';
+
+        if (entry.constant) {
+            const cBadge = document.createElement('span');
+            cBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson bg-[#3a2f10] text-[#e8cc80] border border-[#7a6230]/40';
+            cBadge.textContent = 'constante';
+            cBadge.title = 'Inyeccion permanente en el contexto';
+            badgesContainer.appendChild(cBadge);
+        }
+
+        if (entry.selective) {
+            const sBadge = document.createElement('span');
+            sBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson bg-[#18283e] text-[#7ea8e8] border border-[#364a6a]/40';
+            sBadge.textContent = 'selectivo';
+            if (Array.isArray(entry.secondary_keys) && entry.secondary_keys.length > 0) {
+                sBadge.title = 'Claves secundarias: ' + entry.secondary_keys.join(', ');
+            }
+            badgesContainer.appendChild(sBadge);
+        }
+
+        if (entry.position && entry.position === 'after_char') {
+            const posBadge = document.createElement('span');
+            posBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson bg-surface2 text-text3 border border-border1';
+            posBadge.textContent = 'despues';
+            posBadge.title = 'Posicion: despues del personaje';
+            badgesContainer.appendChild(posBadge);
+        }
+
         const enabledBadge = document.createElement('span');
         enabledBadge.className = 'text-[0.55rem] px-1.5 py-0.5 rounded font-crimson ' + (entry.enabled ? 'bg-editor/20 text-editor' : 'bg-[#3a2020] text-[#e05a5a]');
         enabledBadge.textContent = entry.enabled ? 'activo' : 'inactivo';
+        badgesContainer.appendChild(enabledBadge);
 
         const countEl = document.createElement('span');
         countEl.className = 'text-[0.6rem] text-text3 font-crimson italic';
@@ -1072,7 +1106,7 @@ export function renderLorebook() {
         const arrow = document.createElement('i');
         arrow.className = 'fa-solid fa-chevron-down text-text3 text-[0.7rem] transition-transform duration-300';
 
-        head.append(icon, keysEl, enabledBadge, countEl, arrow);
+        head.append(icon, keysEl, badgesContainer, countEl, arrow);
 
         // Body
         const body = document.createElement('div');
@@ -1101,18 +1135,83 @@ export function renderLorebook() {
             keysSection.className = 'mb-3';
             const kl = document.createElement('label');
             kl.className = 'font-cinzel text-[0.55rem] tracking-wider uppercase text-text3 mb-1 block';
-            kl.textContent = 'Claves (separadas por coma)';
+            kl.textContent = 'Claves primarias (separadas por coma)';
             keysInput = document.createElement('input');
             keysInput.type = 'text';
             keysInput.className = 'w-full bg-bg2 border border-border1 rounded-lg px-3 py-1.5 text-text1 text-xs outline-none focus:border-editor font-mono';
             keysInput.value = entry.keys.join(', ');
             keysInput.addEventListener('click', e => e.stopPropagation());
             keysInput.addEventListener('blur', () => {
-                entry.keys = keysInput.value.split(',').map(k => k.trim()).filter(k => k);
+                entry.keys = keysInput.value.split(',').map(k => k.trim()).filter(Boolean);
                 keysEl.textContent = entry.keys.length > 0 ? entry.keys.join(', ') : '(sin claves)';
             });
             keysSection.append(kl, keysInput);
             body.append(keysSection);
+
+            // Flags avanzadas de Lorebook
+            const advSection = document.createElement('div');
+            advSection.className = 'grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3 p-3 rounded-lg bg-bg/60 border border-border1 text-xs';
+
+            // Claves secundarias
+            const secDiv = document.createElement('div');
+            const secLbl = document.createElement('label');
+            secLbl.className = 'font-cinzel text-[0.55rem] tracking-wider uppercase text-text3 mb-1 block';
+            secLbl.textContent = 'Claves secundarias (opcional)';
+            const secInput = document.createElement('input');
+            secInput.type = 'text';
+            secInput.className = 'w-full bg-bg2 border border-border1 rounded-lg px-2.5 py-1.5 text-text1 text-xs outline-none focus:border-editor font-mono';
+            secInput.placeholder = 'ej: magia, antiguo...';
+            secInput.value = Array.isArray(entry.secondary_keys) ? entry.secondary_keys.join(', ') : '';
+            secInput.addEventListener('click', e => e.stopPropagation());
+            secInput.addEventListener('blur', () => {
+                entry.secondary_keys = secInput.value.split(',').map(k => k.trim()).filter(Boolean);
+            });
+            secDiv.append(secLbl, secInput);
+
+            // Posicion de insercion
+            const posDiv = document.createElement('div');
+            const posLbl = document.createElement('label');
+            posLbl.className = 'font-cinzel text-[0.55rem] tracking-wider uppercase text-text3 mb-1 block';
+            posLbl.textContent = 'Posicion de insercion';
+            const posSelect = document.createElement('select');
+            posSelect.className = 'w-full bg-bg2 border border-border1 rounded-lg px-2.5 py-1.5 text-text1 text-xs outline-none focus:border-editor themed-select';
+            posSelect.innerHTML = '<option value="before_char">Antes del personaje (before_char)</option><option value="after_char">Despues del personaje (after_char)</option>';
+            posSelect.value = entry.position || 'before_char';
+            posSelect.addEventListener('click', e => e.stopPropagation());
+            posSelect.addEventListener('change', () => {
+                entry.position = posSelect.value;
+            });
+            posDiv.append(posLbl, posSelect);
+
+            // Checkboxes: Constante y Selectivo
+            const flagsDiv = document.createElement('div');
+            flagsDiv.className = 'flex items-center gap-4 col-span-1 sm:col-span-2 pt-1';
+
+            const cLbl = document.createElement('label');
+            cLbl.className = 'inline-flex items-center gap-1.5 cursor-pointer text-text2 hover:text-text1 select-none';
+            const cCheck = document.createElement('input');
+            cCheck.type = 'checkbox';
+            cCheck.className = 'accent-[#c9a84c]';
+            cCheck.checked = Boolean(entry.constant);
+            cCheck.addEventListener('change', () => {
+                entry.constant = cCheck.checked;
+            });
+            cLbl.append(cCheck, document.createTextNode(' Constante (siempre en contexto)'));
+
+            const sLbl = document.createElement('label');
+            sLbl.className = 'inline-flex items-center gap-1.5 cursor-pointer text-text2 hover:text-text1 select-none';
+            const sCheck = document.createElement('input');
+            sCheck.type = 'checkbox';
+            sCheck.className = 'accent-[#7ea8e8]';
+            sCheck.checked = Boolean(entry.selective);
+            sCheck.addEventListener('change', () => {
+                entry.selective = sCheck.checked;
+            });
+            sLbl.append(sCheck, document.createTextNode(' Selectivo (requiere secundarias)'));
+
+            flagsDiv.append(cLbl, sLbl);
+            advSection.append(secDiv, posDiv, flagsDiv);
+            body.append(advSection);
         }
 
         // Content

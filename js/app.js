@@ -241,6 +241,61 @@ document.addEventListener('DOMContentLoaded', async () => {
     $('emptyVaultBtn')?.addEventListener('click', openVault);
     $('saveActionVaultBtn')?.addEventListener('click', saveCurrentToVault);
 
+    /* ── Character Avatar Preview & Replace ── */
+    let avatarObjectUrl = null;
+    function updateAvatarPreview() {
+        const container = $('charAvatarContainer');
+        const img = $('charAvatarImg');
+        const info = $('charAvatarInfo');
+        if (!container || !img) return;
+
+        if (avatarObjectUrl) {
+            URL.revokeObjectURL(avatarObjectUrl);
+            avatarObjectUrl = null;
+        }
+
+        if (state.file.pngFile) {
+            avatarObjectUrl = URL.createObjectURL(state.file.pngFile);
+            img.src = avatarObjectUrl;
+            if (info) info.textContent = state.file.pngFile.name || 'Retrato vinculado';
+            container.classList.remove('hidden');
+        } else {
+            img.src = '';
+            container.classList.add('hidden');
+        }
+    }
+
+    $('charAvatarBtn')?.addEventListener('click', () => $('charAvatarInput')?.click());
+    $('changeAvatarBtn')?.addEventListener('click', () => $('charAvatarInput')?.click());
+    $('charAvatarInput')?.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (file.size > 10 * 1024 * 1024) { showToast('El retrato debe pesar menos de 10 MB', 'error'); return; }
+        state.file.pngFile = file;
+        updateAvatarPreview();
+        updLP();
+        showToast('Retrato actualizado', 'success');
+        e.target.value = '';
+    });
+
+    const avatarBox = $('charAvatarContainer');
+    if (avatarBox) {
+        avatarBox.addEventListener('dragover', e => { e.preventDefault(); avatarBox.classList.add('border-goldDim'); });
+        avatarBox.addEventListener('dragleave', () => avatarBox.classList.remove('border-goldDim'));
+        avatarBox.addEventListener('drop', e => {
+            e.preventDefault();
+            avatarBox.classList.remove('border-goldDim');
+            const file = e.dataTransfer?.files?.[0];
+            if (file && (file.type.startsWith('image/') || file.name.endsWith('.png'))) {
+                if (file.size > 10 * 1024 * 1024) { showToast('El retrato debe pesar menos de 10 MB', 'error'); return; }
+                state.file.pngFile = file;
+                updateAvatarPreview();
+                updLP();
+                showToast('Retrato actualizado', 'success');
+            }
+        });
+    }
+
     /* ── Vault events ── */
     document.addEventListener('vault:load-card', (e) => {
         const { card, name, portrait, portraitName } = e.detail || {};
@@ -250,6 +305,7 @@ document.addEventListener('DOMContentLoaded', async () => {
            pasa a base64. Sin esto, cargar de la boveda dejaba pngFile a null y
            reexportar PNG pedia otra vez la imagen. */
         state.file.pngFile = asPortraitFile(portrait, portraitName || ((name || 'carta') + '.png'));
+        updateAvatarPreview();
         resetCardState();
         extractFields(card);
         if (name && charNameInput) { charNameInput.value = name; updLP(); }
@@ -339,6 +395,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (dup > 0) msg += ' (' + dup + ' dup. resueltos)';
         setStatus(msg, 'success');
         showCard({ title: fn, count });
+        updateAvatarPreview();
     }
 
     dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); });
@@ -372,6 +429,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         closeExp(); closeAddF(); closeExpModal(); rstDel();
         if (fileInput) fileInput.value = '';
         state.file.uploaded = null; state.file.extracted = {}; state.file.pngFile = null;
+        updateAvatarPreview();
         state.proc.data = {}; state.proc.edited.clear(); state.proc.collapsed.clear();
         state.editor.active = false; state.editor.added.clear(); state.editor.removed.clear();
         state.jsonEditor.snap = null; state.jsonEditor.dirty = false; state.jsonEditor.err = null;

@@ -160,6 +160,20 @@
                 <div class="space-y-4">
                     <label for="dropzone-file" id="dropzone" class="dropzone-anim relative block border-2 border-dashed border-border2 hover:border-goldDim hover:bg-goldDim/5 rounded-xl p-5 text-center cursor-pointer transition-all overflow-hidden group"><div class="relative z-10"><i class="fa-solid fa-wand-magic-sparkles text-2xl text-text3 group-hover:text-goldDim transition-colors mb-2"></i><p class="text-sm text-text2"><strong>Haz clic</strong> o arrastra aqui</p><p class="text-xs text-text3 italic mt-1">JSON · PNG con meta (max. 10 MB)</p></div><input id="dropzone-file" type="file" class="hidden" accept=".json,.png,image/png,application/json"></label>
                     <div id="uploadStatus" class="hidden text-xs p-2.5 rounded-lg text-center italic border"></div>
+                    <div id="charAvatarContainer" class="hidden flex items-center gap-3 p-3 rounded-xl bg-surface2/60 border border-border1">
+                        <div id="charAvatarBtn" class="relative w-12 h-12 rounded-lg overflow-hidden border border-goldDim/60 shrink-0 bg-bg group cursor-pointer" title="Cambiar imagen de la carta">
+                            <img id="charAvatarImg" class="w-full h-full object-cover" alt="Retrato">
+                            <div class="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                <i class="fa-solid fa-camera text-gold text-xs"></i>
+                            </div>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="font-cinzel text-[0.62rem] uppercase tracking-wider text-gold">Retrato vinculado</p>
+                            <p id="charAvatarInfo" class="text-[0.65rem] text-text3 italic truncate">PNG activo</p>
+                            <button id="changeAvatarBtn" type="button" class="mt-0.5 text-[0.6rem] text-gold hover:underline font-crimson inline-flex items-center gap-1"><i class="fa-solid fa-image text-[0.55rem]"></i> Cambiar imagen</button>
+                        </div>
+                        <input id="charAvatarInput" type="file" class="hidden" accept="image/png,image/jpeg,image/webp">
+                    </div>
                     <label class="block text-text3">Nombre del personaje <span class="font-crimson lowercase italic text-gold">{{char}}</span><input type="text" id="charName" class="mt-2 w-full bg-surface2 border border-border1 rounded-lg px-3 py-2.5 text-text1 outline-none focus:border-goldDim" placeholder="Ej: Gandalf..."></label>
                     <div id="charPreview" class="hidden flex-wrap gap-2"><span id="charBadge" class="text-xs px-2.5 py-0.5 rounded-full bg-goldDim/20 border border-goldDim/50 text-char italic"></span></div>
                 </div>

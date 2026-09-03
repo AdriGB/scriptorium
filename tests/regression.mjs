@@ -639,4 +639,47 @@ const viaJson = JSON.parse(JSON.stringify(exportedRecord));
 assert.ok(viaJson.portraitB64.b64.length > 8);
 assert.equal(portraitFromBundle(viaJson.portraitB64).size, portraitFile.size);
 
+/* ── Proteccion de macros en traduccion ── */
+const { protectMacros, unprotectMacros } = await import(new URL('../js/translator.js', import.meta.url));
+
+const sampleText = 'Hola {{user}}, soy {{char}}. Tu rol es {{role}}.';
+const { text: protectedText, map: macroMap } = protectMacros(sampleText);
+assert.ok(!protectedText.includes('{{user}}'), 'Las macros no deben estar en el texto protegido');
+assert.ok(!protectedText.includes('{{char}}'), 'Las macros no deben estar en el texto protegido');
+assert.equal(macroMap.length, 3, 'Debe detectar las 3 macros');
+
+// Simular respuesta del traductor manteniendo o con ligeras alteraciones de espacios
+const simulatedTranslation = protectedText.replace('Hola', 'Hello').replace('soy', 'I am');
+const restoredText = unprotectMacros(simulatedTranslation, macroMap);
+assert.equal(restoredText, 'Hello {{user}}, I am {{char}}. Tu rol es {{role}}.', 'Debe restaurar exactamente las macros originales');
+
+/* ── Lorebook avanzado (SillyTavern) ── */
+const cardWithAdvancedLore = {
+    spec: 'chara_card_v2',
+    spec_version: '2.0',
+    data: {
+        name: 'Hero',
+        character_book: {
+            entries: [{
+                keys: ['espada'],
+                secondary_keys: ['fuego', 'magia'],
+                selective: true,
+                constant: true,
+                position: 'after_char',
+                content: 'La espada llameante.',
+                enabled: true
+            }]
+        }
+    }
+};
+
+extractFields(cardWithAdvancedLore);
+const exportedCard = buildExp();
+const loreEntry = exportedCard.data.character_book.entries[0];
+assert.equal(loreEntry.selective, true, 'selective debe preservarse');
+assert.equal(loreEntry.constant, true, 'constant debe preservarse');
+assert.equal(loreEntry.position, 'after_char', 'position debe preservarse');
+assert.deepEqual(loreEntry.secondary_keys, ['fuego', 'magia'], 'secondary_keys deben preservarse');
+
 console.log('Regresiones funcionales: OK');
+

@@ -25,9 +25,32 @@ export async function trChunk(t, tl, sig) {
     return d[0].map(s => s[0]).join('');
 }
 
+export function protectMacros(text) {
+    if (!text || typeof text !== 'string') return { text: '', map: [] };
+    const map = [];
+    const protectedText = text.replace(/\{\{\s*[\w.-]+\s*\}\}/gi, (match) => {
+        const token = `⟦VAR_${map.length}⟧`;
+        map.push({ token, original: match });
+        return token;
+    });
+    return { text: protectedText, map };
+}
+
+export function unprotectMacros(text, map) {
+    if (!text || !Array.isArray(map) || map.length === 0) return text || '';
+    let restored = text;
+    for (const { token, original } of map) {
+        const cleanToken = token.replace(/[⟦⟧]/g, '');
+        const re = new RegExp(`⟦\\s*${cleanToken}\\s*⟧`, 'g');
+        restored = restored.replace(re, original);
+    }
+    return restored;
+}
+
 export async function trText(t, tl = 'es', sig, onProgress) {
     if (!t || !t.trim()) return '';
-    const chunks = splitCh(t), total = chunks.length, results = [];
+    const { text: safeText, map } = protectMacros(t);
+    const chunks = splitCh(safeText), total = chunks.length, results = [];
     for (let i = 0; i < total; i++) {
         if (sig?.aborted) throw new DOMException('Aborted', 'AbortError');
         if (onProgress) onProgress(i + 1, total);
@@ -37,7 +60,7 @@ export async function trText(t, tl = 'es', sig, onProgress) {
             results.push('[fragmento no traducido]');
         }
     }
-    return results.join('');
+    return unprotectMacros(results.join(''), map);
 }
 
 export function checkTranslationPrivacy() {
