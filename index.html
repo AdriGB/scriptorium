@@ -98,8 +98,11 @@
         #fieldIndex{position:absolute;top:6px;right:7px;bottom:6px;width:26px;display:flex;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s ease;z-index:20}
         #fieldIndex[hidden]{display:none}
         #fieldIndex.is-visible{opacity:1;pointer-events:auto}
-        #fieldIndex .fi-track{position:relative;width:7px;height:100%;border-radius:4px;background:rgba(10,11,20,.55);box-shadow:inset 0 0 0 1px rgba(54,58,106,.5)}
-        #fieldIndex .fi-viewport{position:absolute;left:0;right:0;border-radius:4px;background:rgba(201,168,76,.14);box-shadow:inset 0 0 0 1px rgba(201,168,76,.3);pointer-events:none}
+        #fieldIndex.is-dragging,#fieldIndex.is-dragging *{cursor:grabbing!important;user-select:none}
+        #fieldIndex .fi-track{position:relative;width:7px;height:100%;border-radius:4px;background:rgba(10,11,20,.55);box-shadow:inset 0 0 0 1px rgba(54,58,106,.5);cursor:pointer}
+        #fieldIndex .fi-viewport{position:absolute;left:0;right:0;border-radius:4px;background:rgba(201,168,76,.14);box-shadow:inset 0 0 0 1px rgba(201,168,76,.3);pointer-events:auto;cursor:grab;touch-action:none;transition:background-color .15s}
+        #fieldIndex .fi-viewport:hover{background:rgba(201,168,76,.24);box-shadow:inset 0 0 0 1px rgba(201,168,76,.5)}
+        #fieldIndex.is-dragging .fi-viewport{background:rgba(201,168,76,.32);box-shadow:inset 0 0 0 1px #c9a84c}
         /* La barra visible vive en ::after, no en el boton: si se la aplicara al
            boton, el scaleX de hover/activo estiraria tambien el titulo. */
         #fieldIndex .fi-tick{position:absolute;left:0;width:7px;border:none;padding:0;background:none;cursor:pointer}
@@ -113,6 +116,10 @@
         #fieldIndex .fi-tick::before{content:'';position:absolute;left:-6px;right:-6px;top:-3px;bottom:-3px}
         #fieldIndex .fi-tick:hover::after{background:#a89b6a;transform:scaleX(1.6)}
         #fieldIndex .fi-tick.is-active::after{background:#c9a84c;transform:scaleX(1.6)}
+        #fieldIndex .fi-tick.is-created::after{background:#3ab8a0}
+        #fieldIndex .fi-tick.is-created:hover::after{background:#5ce0c6}
+        #fieldIndex .fi-tick.is-disabled{opacity:.4}
+        #fieldIndex .fi-tick.is-disabled::after{background:#555977}
         #fieldIndex .fi-tick:focus-visible{outline:2px solid #e8cc80;outline-offset:2px}
         /* Titulo del campo, visible con el rail (sin pasar el raton por la marca) y
            colocado en coordenadas del rail por el JS. Solo el nombre: un trozo del
@@ -122,6 +129,7 @@
         #fieldIndex .fi-tick.is-active .fi-label{color:#e8cc80;border-color:#7a6230;background:rgba(22,24,46,.95)}
         #fieldIndex.labels-compact .fi-label{opacity:0}
         #fieldIndex.labels-compact .fi-tick.is-active .fi-label{opacity:1}
+        #fieldIndex.labels-compact .fi-tick:hover .fi-label{opacity:1;z-index:25;background:rgba(22,24,46,.96);border-color:#7a6230;color:#e8cc80}
         @media(max-width:767.98px){#fieldIndex{display:none}}
     </style>
 </head>

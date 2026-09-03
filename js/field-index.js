@@ -1,5 +1,6 @@
 // js/field-index.js - minimapa de campos sobre la scrollbar
 
+import state from './state.js';
 import { $, activeFieldView } from './utils.js';
 
 const TICK_GAP = 2;    // px minimos entre marcas
@@ -103,6 +104,8 @@ export function computeTicks(items, total, trackHeight, minHeight = TICK_MIN, la
         top: tops[i],
         height: heights[i],
         labelTop: labelTops[i],
+        isCreated: Boolean(it.isCreated),
+        isDisabled: Boolean(it.isDisabled),
     }));
     ticks.labelsFit = labelsFit;
     return ticks;
@@ -168,11 +171,20 @@ function rebuild() {
     const cRect = scroller.getBoundingClientRect();
     entries = cards.map(card => {
         const r = card.getBoundingClientRect();
+        const key = card.dataset.key || '';
+        const isCreated = Boolean(key && state.editor?.added?.has(key));
+        let isDisabled = false;
+        if (card.dataset.lbIndex !== undefined) {
+            const idx = Number(card.dataset.lbIndex);
+            isDisabled = state.characterBook?.entries?.[idx]?.enabled === false;
+        }
         return {
             top: r.top - cRect.top + scroller.scrollTop,
             height: r.height,
-            key: card.dataset.key || '',
+            key,
             label: fieldLabel(card),
+            isCreated,
+            isDisabled,
         };
     }).sort((a, b) => a.top - b.top);
 
@@ -195,6 +207,8 @@ function rebuild() {
         b.dataset.index = String(i);
         b.title = t.label;
         b.setAttribute('aria-label', 'Ir a ' + t.label);
+        b.classList.toggle('is-created', Boolean(t.isCreated));
+        b.classList.toggle('is-disabled', Boolean(t.isDisabled));
         // La etiqueta se coloca en coordenadas del rail dentro del boton, porque
         // es donde esta calculado el reparto sin solapes.
         const lab = b.firstElementChild;
@@ -245,6 +259,66 @@ export function initFieldIndex() {
     track.appendChild(viewport);
     rail.appendChild(track);
 
+    let isDragging = false;
+
+    function applyScrollFromPointer(clientY, startClientY, startScrollTop, isViewportRelative) {
+        const total = scroller.scrollHeight;
+        const trackH = track.clientHeight;
+        if (!total || !trackH) return;
+
+        if (isViewportRelative) {
+            const deltaY = clientY - startClientY;
+            const ratio = total / trackH;
+            scroller.scrollTop = Math.max(0, Math.min(total - scroller.clientHeight, startScrollTop + deltaY * ratio));
+        } else {
+            const trackRect = track.getBoundingClientRect();
+            const y = Math.max(0, Math.min(trackH, clientY - trackRect.top));
+            const targetScroll = (y / trackH) * total - scroller.clientHeight / 2;
+            scroller.scrollTop = Math.max(0, Math.min(total - scroller.clientHeight, targetScroll));
+        }
+    }
+
+    function startScrub(e, isViewportRelative) {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        isDragging = true;
+        rail.classList.add('is-dragging');
+        const startY = e.clientY;
+        const startScroll = scroller.scrollTop;
+
+        if (!isViewportRelative) {
+            applyScrollFromPointer(e.clientY, startY, startScroll, false);
+        }
+
+        function onPointerMove(ev) {
+            ev.preventDefault();
+            applyScrollFromPointer(ev.clientY, startY, startScroll, isViewportRelative);
+        }
+
+        function onPointerUp() {
+            isDragging = false;
+            rail.classList.remove('is-dragging');
+            window.removeEventListener('mousemove', onPointerMove);
+            window.removeEventListener('mouseup', onPointerUp);
+            if (!wrapper.matches(':hover') && !rail.contains(document.activeElement)) {
+                setVisible(false);
+            }
+        }
+
+        window.addEventListener('mousemove', onPointerMove);
+        window.addEventListener('mouseup', onPointerUp);
+    }
+
+    viewport.addEventListener('mousedown', e => {
+        e.stopPropagation();
+        startScrub(e, true);
+    });
+
+    track.addEventListener('mousedown', e => {
+        if (e.target.closest('.fi-tick')) return; // los ticks manejan su propio click
+        startScrub(e, false);
+    });
+
     scroller.addEventListener('mousemove', e => {
         const r = scroller.getBoundingClientRect();
         setVisible(e.clientX >= r.right - REVEAL_ZONE);
@@ -252,7 +326,7 @@ export function initFieldIndex() {
     // El rail es hermano del scroller: sin escuchar el envoltorio, mover el raton
     // hacia el rail dispararia mouseleave y se ocultaria justo al ir a pulsarlo.
     wrapper.addEventListener('mouseleave', () => {
-        if (!rail.contains(document.activeElement)) setVisible(false);
+        if (!isDragging && !rail.contains(document.activeElement)) setVisible(false);
     });
     rail.addEventListener('focusin', () => setVisible(true));
     rail.addEventListener('focusout', () => setVisible(false));

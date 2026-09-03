@@ -492,6 +492,17 @@ for (const [name, items, total] of tickSets) {
 assert.deepEqual(computeTicks(tickSets[0][1], 1000, RAIL).map(t => t.label),
     ['Nombre', 'Descripcion', 'Saludo']);
 
+// Conserva flags de estado semantico (campos creados y entradas desactivadas)
+const statefulItems = [
+    { key: 'custom_1', label: 'Campo Creado', top: 0, height: 100, isCreated: true, isDisabled: false },
+    { key: 'lore_off', label: 'Entrada Inactiva', top: 100, height: 100, isCreated: false, isDisabled: true }
+];
+const statefulTicks = computeTicks(statefulItems, 500, RAIL);
+assert.equal(statefulTicks[0].isCreated, true, 'isCreated se preserva en tick');
+assert.equal(statefulTicks[0].isDisabled, false, 'isDisabled se preserva en tick');
+assert.equal(statefulTicks[1].isCreated, false, 'isCreated false se preserva');
+assert.equal(statefulTicks[1].isDisabled, true, 'isDisabled se preserva en tick');
+
 /* Los titulos se pintan todos a la vez, asi que no pueden pisarse ni salirse del
    rail. Cuando no caben, `labelsFit` avisa al DOM para que solo pinte el del
    campo activo en lugar de apilar cuarenta renglones ilegibles. */
