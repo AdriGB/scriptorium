@@ -293,6 +293,7 @@ export function createCard(key, text, isRaw, animate = true) {
         if (c) { body.style.maxHeight = body.scrollHeight + 'px'; requestAnimationFrame(() => { card.classList.add('collapsed'); body.style.maxHeight = '0px'; }); }
         else { card.classList.remove('collapsed'); body.style.maxHeight = body.scrollHeight + 'px'; body.addEventListener('transitionend', function oe(e) { if (e.propertyName === 'max-height') { body.style.maxHeight = 'none'; body.removeEventListener('transitionend', oe); } }); }
         head.setAttribute('aria-expanded', String(!c));
+        updateCollapseAllBtn();
     };
     head.addEventListener('click', e => { if (e.target.closest('.editor-field-name') || e.target.closest('.editor-ctrl-btn')) return; togC(); });
     head.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); togC(); } });
@@ -1209,6 +1210,7 @@ export function renderLorebook() {
             if (c) { body.style.maxHeight = body.scrollHeight + 'px'; requestAnimationFrame(() => { card.classList.add('collapsed'); body.style.maxHeight = '0px'; }); }
             else { card.classList.remove('collapsed'); body.style.maxHeight = body.scrollHeight + 'px'; body.addEventListener('transitionend', function oe(e) { if (e.propertyName === 'max-height') { body.style.maxHeight = 'none'; body.removeEventListener('transitionend', oe); } }); }
             head.setAttribute('aria-expanded', String(!c));
+            updateCollapseAllBtn();
         };
         head.addEventListener('click', e => { if (e.target.closest('.editor-ctrl-btn')) return; togC(); });
 
