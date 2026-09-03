@@ -128,8 +128,19 @@ export function buildExp() {
     } else {
         card = { spec: 'chara_card_v2', spec_version: '2.0', data: {} };
     }
-    card.spec = 'chara_card_v2';
-    card.spec_version = '2.0';
+    /* Nunca degradar. Antes se estampaba V2 por encima sin mirar, y como el
+       clon de arriba conserva `data` entero, el resultado era una carta que
+       decia `chara_card_v2` y llevaba dentro datos de V3 (assets, lorebook con
+       `use_regex`/`constant`/`selective`, `group_only_greetings`). SillyTavern
+       la leeria como V2 y tiraria todo eso a la basura sin decir nada.
+
+       Solo se rellena V2 cuando la carta no trae spec: es el caso de una carta
+       nueva o de un JSON suelto. Si ya es V3, se deja el `spec_version` tal
+       cual, porque la especificacion dice no rechazar versiones futuras. */
+    if (card.spec !== 'chara_card_v3') {
+        card.spec = 'chara_card_v2';
+        card.spec_version = '2.0';
+    }
     card.data.name = cn;
 
     // Migrate legacy extensions

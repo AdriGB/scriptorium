@@ -11,9 +11,10 @@
 
 ## ✨ Características Principales
 
-* **Compatibilidad Estándar:** Importación y exportación compatible con el formato `chara_card_v2` (soporta archivos `.json` y metadatos integrados en imágenes `.png`).
-* **Lectura PNG completa:** Soporte para los tres tipos de chunks PNG con metadatos `chara`: `tEXt`, `zTXt` (comprimido deflate) e `iTXt` (UTF-8 con compresión opcional).
-* **Escritura PNG:** Inyección directa de tarjetas de vuelta a imágenes PNG, eliminando chunks `chara` anteriores e insertando el nuevo antes de `IEND`.
+* **Compatibilidad Estándar:** Importación y exportación compatible con los formatos `chara_card_v2` y `chara_card_v3` (soporta archivos `.json` y metadatos integrados en imágenes `.png`).
+* **Lectura PNG completa:** Soporte para chunks PNG con metadatos `chara` y `ccv3`: `tEXt`, `zTXt` (comprimido deflate) e `iTXt` (UTF-8 con compresión opcional), dando prioridad a `ccv3` sobre `chara` según la especificación V3.
+* **Escritura PNG:** Inyección directa de tarjetas de vuelta a imágenes PNG (`ccv3` para V3, `chara` para V2), eliminando chunks anteriores de ambos tipos para evitar colisiones e insertando el nuevo antes de `IEND`.
+* **Preservación sin degradación:** Al exportar tarjetas V3, se conservan su especificación y campos avanzados (assets, flags extendidas de lorebook) sin degradar en silencio a V2.
 * **Sustitución en Tiempo Real:** Reemplazo dinámico e interactivo de etiquetas de sistema como `{{char}}` y `{{user}}`.
 * **Aislamiento de Metadatos:** Gestión de campos personalizados mediante el namespace `extensions.scriptorium` dentro de `data` (según la especificación V2), con versionado explícito de esquema (`version: 1`), evitando mezclar notas humanas con datos estructurados.
 * **Compatibilidad hacia atrás:** Capacidad de lectura y extracción de esquemas y formatos legados (incluyendo `extensions` en la raíz) sin romper tarjetas antiguas. Migración automática al formato correcto al exportar.

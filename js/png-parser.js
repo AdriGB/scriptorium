@@ -67,7 +67,12 @@ export async function extPNG(file) {
         throw new Error('PNG invalido - firma incorrecta');
 
     let off = 8;
-    let foundChara = false;
+    /* Candidatos, no el primero que aparece. La especificacion V3 es clara:
+       "if the application detects both `chara` and `ccv3` chunk, the application
+       SHOULD use the `ccv3` chunk". Devolver el primero daria la carta vieja en
+       un PNG que SillyTavern reescribio, que es justo el caso que va a ser
+       habitual. Se guardan todos y se elige al final por preferencia. */
+    const candidates = [];
 
     while (off + 12 <= dv.byteLength) {
         const len = dv.getUint32(off);
@@ -83,16 +88,19 @@ export async function extPNG(file) {
                 if (c === 0 && ik) { ik = false; continue; }
                 if (ik) kw += String.fromCharCode(c); else val += String.fromCharCode(c);
             }
-            if (kw === 'chara') {
-                foundChara = true;
+            /* `ccv3` (V3) y `chara` (V2). La especificacion V3 fija que la carta
+               va en un tEXt llamado `ccv3`, con el mismo encoding que V2
+               (JSON -> utf-8 -> base64), asi que no hay nada que cambiar en la
+               decodificacion: solo el nombre del chunk y la prioridad. */
+            if (kw === 'ccv3' || kw === 'chara') {
                 if (val.length > MAX_CARD_BYTES) throw new Error('Payload excede limite de seguridad (2MB)');
-                return decodeCharaPayload(val);
+                candidates.push({ rank: kw === 'ccv3' ? 2 : 1, payload: val });
             }
         } else if (type === 'zTXt') {
             let kw = '', i = 0;
             while (i < len && u8[off + 8 + i] !== 0) { kw += String.fromCharCode(u8[off + 8 + i]); i++; }
             i++;
-            if (kw === 'chara' && i < len) {
+            if ((kw === 'chara' || kw === 'ccv3') && i < len) {
                 const cm = u8[off + 8 + i]; i++;
                 if (cm === 0 && i < len) {
                     try {
@@ -100,8 +108,7 @@ export async function extPNG(file) {
                         if (dec) {
                             if (dec.length > MAX_CARD_BYTES) throw new Error('Payload excede limite de seguridad');
                             const text = new TextDecoder('latin1').decode(dec);
-                            foundChara = true;
-                            return decodeCharaPayload(text);
+                            candidates.push({ rank: kw === 'ccv3' ? 2 : 1, payload: text });
                         }
                     } catch (e) { if (e.message?.includes('Payload') || e.message?.includes('limite')) throw e; }
                 }
@@ -110,7 +117,7 @@ export async function extPNG(file) {
             let kw = '', i = 0;
             while (i < len && u8[off + 8 + i] !== 0) { kw += String.fromCharCode(u8[off + 8 + i]); i++; }
             i++; // null separator after keyword
-            if (kw === 'chara' && i + 2 < len) {
+            if ((kw === 'chara' || kw === 'ccv3') && i + 2 < len) {
                 const compressionFlag = u8[off + 8 + i]; i++;
                 const compressionMethod = u8[off + 8 + i]; i++;
                 // FIX: validar metodo de compresion
@@ -139,15 +146,24 @@ export async function extPNG(file) {
                     off += 12 + len;
                     continue;
                 }
-                try {
-                    foundChara = true;
-                    return decodeCharaPayload(text);
-                } catch { /* sigue buscando */ }
+                candidates.push({ rank: kw === 'ccv3' ? 2 : 1, payload: text });
             }
         }
         if (type === 'IEND') break;
         off += 12 + len;
     }
-    if (foundChara) throw new Error('Se encontro chara pero no se pudo decodificar');
-    throw new Error("Sin metadatos 'chara'. Asegurate que es una tarjeta valida.");
+
+    /* Se prueba por orden de preferencia, no solo el de mas rango: un `ccv3`
+       roto no puede tapar un `chara` que si se lee. Solo si ninguno decodifica
+       se falla, y con el motivo del ultimo intento. */
+    if (candidates.length) {
+        // sort() es estable: a igual rango gana el que venia primero en el fichero.
+        candidates.sort((a, b) => b.rank - a.rank);
+        let lastErr;
+        for (const c of candidates) {
+            try { return decodeCharaPayload(c.payload); } catch (e) { lastErr = e; }
+        }
+        throw new Error('Se encontro la carta pero no se pudo decodificar: ' + (lastErr?.message || 'sin detalle'));
+    }
+    throw new Error("Sin metadatos 'chara' ni 'ccv3'. Asegurate que es una tarjeta valida.");
 }

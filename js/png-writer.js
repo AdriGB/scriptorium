@@ -33,7 +33,10 @@ function buildChunk(type, data) {
 
 export async function injectCharaToPng(pngFile, cardObj) {
     const payload = encodeCharaPayload(cardObj);
-    const keyword = 'chara';
+    /* V3 va en un chunk `ccv3`; V2 en `chara`. Mismo encoding (JSON -> utf-8 ->
+       base64), cambia el nombre. Si la carta era V3 se escribe V3: degradarla
+       aqui seria perder los assets y las flags nuevas del lorebook. */
+    const keyword = cardObj?.spec === 'chara_card_v3' ? 'ccv3' : 'chara';
     const text = keyword + '\0' + payload;
     const textBytes = new TextEncoder().encode(text);
     const textChunk = buildChunk('tEXt', textBytes);
@@ -75,7 +78,11 @@ export async function injectCharaToPng(pngFile, cardObj) {
                     if (c===0) break;
                     kw+=String.fromCharCode(c);
                 }
-                return kw==='chara';
+                /* Los dos keywords, no solo el que vamos a escribir: si el PNG
+                   traia el otro y lo dejamos, mandaria el viejo. La
+                   especificacion V3 dice que `ccv3` gana sobre `chara`, asi que
+                   un `ccv3` rancio taparia una carta V2 recien guardada. */
+                return kw==='chara' || kw==='ccv3';
             } catch { return false; }
         })();
         if (!isOldChara) parts.push(chunkBytes);

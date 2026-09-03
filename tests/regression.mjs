@@ -22,7 +22,7 @@ Object.defineProperty(globalThis, 'navigator', {
 });
 
 const { default: state } = await import('../js/state.js');
-const { buildExp } = await import('../js/chara-card.js');
+const { buildExp, extractFields } = await import('../js/chara-card.js');
 const { copyAll } = await import('../js/export.js');
 
 state.file.uploaded = {
@@ -155,7 +155,7 @@ globalThis.atob = (s) => {
 };
 
 const { extPNG } = await import(new URL('../js/png-parser.js', import.meta.url));
-const { tEXtBase64, tEXtJson, tEXtRaw, zTXt, iTXt, plainPng, toFile, sampleCard } =
+const { tEXtBase64, tEXtJson, tEXtRaw, tEXtChunk, tEXtChunkRaw, pngWith, ccv3, zTXt, iTXt, plainPng, toFile, sampleCard, sampleCardV3 } =
     await import(new URL('./png-fixture.mjs', import.meta.url));
 
 const pngCard = sampleCard();
@@ -193,6 +193,33 @@ await assert.rejects(() => extPNG(toFile(Buffer.alloc(0))), /vacio/);
 await assert.rejects(() => extPNG(toFile(tEXtRaw('chara', 'no es json ni base64'))),
     /no se pudo decodificar|no es JSON/);
 
+/* ── V3 (CharacterCardV3) ──
+   SillyTavern ya exporta V3: un tEXt `ccv3` con el mismo encoding que V2
+   (JSON -> utf-8 -> base64). La especificacion dice que si un PNG trae `chara`
+   y `ccv3`, **manda `ccv3`**. Antes devolviamos el primer chunk que
+   aparecia, asi que un PNG reescrito por SillyTavern daba la carta vieja. */
+const pngV3 = sampleCardV3();
+assert.deepEqual(await extPNG(toFile(ccv3(pngV3))), pngV3, 'V3: lee el chunk ccv3');
+assert.equal((await extPNG(toFile(ccv3(pngV3)))).spec, 'chara_card_v3');
+
+/* El caso que importa: los dos chunks, en los dos ordenes. SillyTavern no
+   garantiza cual va primero, y el `chara` puede ser una copia vieja. */
+for (const [orden, chunks] of [
+    ['ccv3 primero', [tEXtChunk('ccv3', pngV3), tEXtChunk('chara', pngCard)]],
+    ['chara primero', [tEXtChunk('chara', pngCard), tEXtChunk('ccv3', pngV3)]]
+]) {
+    assert.deepEqual(await extPNG(toFile(pngWith(...chunks))), pngV3, orden + ': debe mandar ccv3');
+}
+/* Un `ccv3` roto no puede tapar un `chara` que si se lee: se prueba por orden
+   de preferencia, no solo el de mas rango. */
+assert.deepEqual(
+    await extPNG(toFile(pngWith(tEXtChunkRaw('ccv3', 'estropeado'), tEXtChunk('chara', pngCard)))),
+    pngCard, 'ccv3 roto: cae al chara de V2'
+);
+
+assert.deepEqual(await extPNG(toFile(zTXt(pngV3, 'ccv3'))), pngV3, 'V3: lee chunk zTXt ccv3');
+assert.deepEqual(await extPNG(toFile(iTXt(pngV3, { keyword: 'ccv3' }))), pngV3, 'V3: lee chunk iTXt ccv3');
+
 globalThis.atob = nodeAtob;
 
 /* ── Escritura de PNG ──
@@ -201,7 +228,7 @@ globalThis.atob = nodeAtob;
    salir. El round-trip se hace con el parser real, no con un clon de la
    logica de lectura. */
 const { injectCharaToPng, encodeCharaPayload } = await import(new URL('../js/png-writer.js', import.meta.url));
-const { walkChunks, charaChunks } = await import(new URL('./png-fixture.mjs', import.meta.url));
+const { walkChunks, cardChunks } = await import(new URL('./png-fixture.mjs', import.meta.url));
 
 const inject = async (card, base = plainPng()) =>
     Buffer.from(await (await injectCharaToPng(toFile(base), card)).arrayBuffer());
@@ -226,13 +253,49 @@ for (const [name, base] of [
 ]) {
     const otra = { ...pngCard, data: { ...pngCard.data, name: 'Otra carta' } };
     const out = await inject(otra, base);
-    assert.equal(charaChunks(out).length, 1, name + ' viejo: debe quedar un solo chunk chara');
+    assert.equal(cardChunks(out).length, 1, name + ' viejo: debe quedar un solo chunk chara');
     assert.deepEqual(await extPNG(toFile(out)), otra, name + ' viejo: manda el nuevo, no el viejo');
 }
 /* Dos escrituras seguidas: el writer tiene que quitar el chunk que el mismo
    acaba de poner, no apilarlos. */
 const twice = await inject(pngCard, written);
-assert.equal(charaChunks(twice).length, 1, 'Reescribir no apila chunks');
+assert.equal(cardChunks(twice).length, 1, 'Reescribir no apila chunks');
+
+/* ── Escribir V3 ──
+   Una carta V3 se escribe en `ccv3`, y al guardar se quita el keyword del otro
+   spec. Lo segundo es lo facil de olvidar: si el PNG traia un `ccv3` y guardamos
+   V2 sin quitarlo, la especificacion dice que `ccv3` manda y la carta recien
+   guardada quedaria tapada por la vieja. */
+const v3Out = await inject(pngV3);
+assert.deepEqual(await extPNG(toFile(v3Out)), pngV3, 'V3: round-trip escribir -> leer');
+assert.deepEqual(cardChunks(v3Out).map(c => c.keyword), ['ccv3'], 'V3 se escribe en ccv3');
+
+assert.deepEqual(await extPNG(toFile(await inject(pngV3, tEXtBase64(pngCard)))), pngV3,
+    'V3 sobre un PNG que traia chara: no queda nada que estorbe');
+assert.deepEqual(cardChunks(await inject(pngV3, tEXtBase64(pngCard))).map(c => c.keyword), ['ccv3']);
+assert.deepEqual(await extPNG(toFile(await inject(pngCard, ccv3(pngV3)))), pngCard,
+    'V2 sobre un PNG que traia ccv3: el ccv3 viejo no tapa la carta nueva');
+assert.deepEqual(cardChunks(await inject(pngCard, ccv3(pngV3))).map(c => c.keyword), ['chara']);
+
+/* ── No degradar al exportar ──
+   `buildExp()` clona la carta cargada y la parchea, asi que estampar V2 por
+   encima dejaba una carta que decia `chara_card_v2` y llevaba dentro datos de
+   V3. SillyTavern la habria ledo como V2 y tirado los assets sin decir nada. */
+const uploadedPrevio = state.file.uploaded;
+/* Se reproduce el flujo real —cargar la carta y despues exportarla— porque el
+   lorebook se reconstruye desde `state.characterBook`, no desde la carta
+   original: las flags V3 sobreviven solo si `extractFields` las recogio. Es
+   justo la cadena que habria que vigilar si alguien toca esa normalizacion. */
+state.file.uploaded = pngV3;
+extractFields(pngV3);
+const exportV3 = buildExp();
+assert.equal(exportV3.spec, 'chara_card_v3', 'Exportar una carta V3 no la degrada a V2');
+assert.equal(exportV3.spec_version, '3.0');
+assert.deepEqual(exportV3.data.assets, pngV3.data.assets, 'Los assets sobreviven a la exportacion');
+assert.equal(exportV3.data.character_book.entries[0].selective, true, 'Las flags V3 del lorebook sobreviven');
+state.file.uploaded = pngCard;
+assert.equal(buildExp().spec, 'chara_card_v2', 'Una carta V2 se queda en V2');
+state.file.uploaded = uploadedPrevio;
 
 /* Cada chunk con su CRC bien. Es lo que hace que un lector estricto no descarte
    el chunk entero: el PNG abre igual en un visor indulgente, pero la carta se

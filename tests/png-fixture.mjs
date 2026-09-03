@@ -81,18 +81,43 @@ export function tEXtBase64(card, { url = false } = {}) {
     ]))]);
 }
 
+/** Chunk tEXt con keyword y valor literales, para payloads que no son una carta. */
+export function tEXtChunkRaw(keyword, value) {
+    return chunk('tEXt', Buffer.concat([
+        Buffer.from(keyword, 'latin1'), Buffer.from([0]), Buffer.from(value, 'utf8')
+    ]));
+}
+
+/** Chunk tEXt suelto (con longitud y CRC), para componer PNGs a mano. */
+export function tEXtChunk(keyword, card) {
+    const b64 = Buffer.from(JSON.stringify(card), 'utf8').toString('base64');
+    return chunk('tEXt', Buffer.concat([
+        Buffer.from(keyword, 'latin1'), Buffer.from([0]), Buffer.from(b64, 'utf8')
+    ]));
+}
+
+/** PNG armado con los chunks que se le pasen, mas IHDR/IDAT/IEND. */
+export function pngWith(...chunks) { return pngBytes(chunks); }
+
+/* V3 (CharacterCardV3): mismo encoding que V2 (JSON -> utf-8 -> base64) pero en
+   un tEXt llamado `ccv3`. La especificacion lo fija asi, y tambien que si un PNG
+   trae `chara` y `ccv3` **manda `ccv3`**. */
+export function ccv3(card) {
+    return pngBytes([tEXtChunk('ccv3', card)]);
+}
+
 /** zTXt: el JSON deflado, que es como lo escriben la mayoria de las herramientas. */
-export function zTXt(card) {
+export function zTXt(card, keyword = 'chara') {
     return pngBytes([chunk('zTXt', Buffer.concat([
-        Buffer.from('chara', 'latin1'), Buffer.from([0]), Buffer.from([0]),
+        Buffer.from(keyword, 'latin1'), Buffer.from([0]), Buffer.from([0]),
         zlib.deflateSync(Buffer.from(JSON.stringify(card), 'utf8'))
     ]))]);
 }
 
 /** iTXt sin comprimir: keyword, idioma y keyword traducido separados por nulos. */
-export function iTXt(card, { lang = 'es', translated = '' } = {}) {
+export function iTXt(card, { keyword = 'chara', lang = 'es', translated = '' } = {}) {
     return pngBytes([chunk('iTXt', Buffer.concat([
-        Buffer.from('chara', 'latin1'), Buffer.from([0]),
+        Buffer.from(keyword, 'latin1'), Buffer.from([0]),
         Buffer.from([0]), Buffer.from([0]),           // sin comprimir, metodo 0
         Buffer.from(lang, 'latin1'), Buffer.from([0]),
         Buffer.from(translated, 'latin1'), Buffer.from([0]),
@@ -129,11 +154,15 @@ export function walkChunks(bytes) {
     return out;
 }
 
-/** Los chunks de texto que llevan la carta (keyword `chara`). */
-export function charaChunks(bytes) {
+/* Los chunks que llevan una carta, sea V2 (`chara`) o V3 (`ccv3`). Se miran los
+   dos keywords a la vez porque lo que puede romper una carta es que **sobre**
+   uno del otro spec: la especificacion V3 dice que `ccv3` manda sobre `chara`,
+   asi que un `ccv3` rancio tapa una carta V2 recien guardada. */
+export function cardChunks(bytes) {
     return walkChunks(bytes)
         .filter(c => ['tEXt', 'zTXt', 'iTXt'].includes(c.type))
-        .filter(c => c.data.toString('latin1').split('\0')[0] === 'chara');
+        .map(c => ({ ...c, keyword: c.data.toString('latin1').split('\0')[0] }))
+        .filter(c => c.keyword === 'chara' || c.keyword === 'ccv3');
 }
 
 /** Una carta v2 completa, con lorebook y saludos alternativos. */
@@ -172,3 +201,31 @@ export const sampleCard = () => ({
         extensions: {}
     }
 });
+
+/* Carta V3: `data` es un superconjunto de V2. Lo que anade V3 son assets,
+   nickname, group_only_greetings y fechas; el lorebook sigue llamandose
+   `character_book` y sus entradas ganan flags (use_regex, constant, selective,
+   secondary_keys, position). */
+export const sampleCardV3 = () => {
+    const v2 = sampleCard();
+    return {
+        spec: 'chara_card_v3',
+        spec_version: '3.0',
+        data: {
+            ...v2.data,
+            nickname: 'Ada',
+            creator_notes: 'Primera programadora.',
+            group_only_greetings: [],
+            creation_date: 1815,
+            tags: [...(v2.data.tags || []), 'v3'],
+            assets: [{ type: 'icon', uri: 'ccdefault:', name: 'main', ext: 'png' }],
+            character_book: {
+                ...v2.data.character_book,
+                entries: v2.data.character_book.entries.map(e => ({
+                    ...e, use_regex: false, constant: true,
+                    selective: true, secondary_keys: ['motor'], position: 'before_char'
+                }))
+            }
+        }
+    };
+};
