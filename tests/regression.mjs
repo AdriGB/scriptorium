@@ -681,5 +681,64 @@ assert.equal(loreEntry.constant, true, 'constant debe preservarse');
 assert.equal(loreEntry.position, 'after_char', 'position debe preservarse');
 assert.deepEqual(loreEntry.secondary_keys, ['fuego', 'magia'], 'secondary_keys deben preservarse');
 
+/* ── Toasts interactivos con accion ── */
+const toastEl = {
+    style: {},
+    dataset: {},
+    classList: {
+        _set: new Set(),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+    },
+    addEventListener() {}
+};
+const toastIconEl = { className: '' };
+const toastMsgEl = { textContent: '' };
+const toastActionEl = {
+    textContent: '',
+    onclick: null,
+    classList: {
+        _set: new Set(['hidden']),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+    }
+};
+const toastCloseEl = {
+    onclick: null,
+    classList: {
+        _set: new Set(['hidden']),
+        add(c) { this._set.add(c); },
+        remove(c) { this._set.delete(c); },
+        contains(c) { return this._set.has(c); }
+    }
+};
+elements.set('toast', toastEl);
+elements.set('toastIcon', toastIconEl);
+elements.set('toastMsg', toastMsgEl);
+elements.set('toastAction', toastActionEl);
+elements.set('toastClose', toastCloseEl);
+
+const { showToast } = await import('../js/utils.js');
+
+let actionTriggered = false;
+showToast('Aviso de prueba', 'success', {
+    label: 'Deshacer',
+    onClick: () => { actionTriggered = true; }
+});
+
+assert.equal(toastMsgEl.textContent, 'Aviso de prueba');
+assert.equal(toastActionEl.textContent, 'Deshacer');
+assert.equal(toastActionEl.classList.contains('hidden'), false, 'El boton de accion debe estar visible');
+assert.equal(toastCloseEl.classList.contains('hidden'), false, 'El boton de cierre debe estar visible');
+assert.equal(toastEl.style.pointerEvents, 'auto', 'El toast activo debe permitir pointer-events');
+
+// Ejecutar la accion
+toastActionEl.onclick();
+assert.equal(actionTriggered, true, 'La accion debe haberse ejecutado');
+assert.equal(toastEl.style.pointerEvents, 'none', 'Al descartarse debe volver a pointer-events none');
+
 console.log('Regresiones funcionales: OK');
+
 

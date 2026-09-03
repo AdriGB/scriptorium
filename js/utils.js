@@ -230,15 +230,21 @@ const toastQueue = [];
 let toastTm = null;
 let toastActive = false;
 let toastActionFn = null;
+let toastRemainingMs = 0;
+let toastStartedAt = 0;
 
 function dismissToast() {
     const t = $('toast');
     if (!t) return;
     t.style.opacity = '0';
     t.style.transform = 'translate(-50%,1rem)';
+    t.style.pointerEvents = 'none';
     const btn = $('toastAction');
     if (btn) { btn.classList.add('hidden'); btn.onclick = null; }
+    const closeBtn = $('toastClose');
+    if (closeBtn) { closeBtn.classList.add('hidden'); closeBtn.onclick = null; }
     toastActionFn = null;
+    if (toastTm) { clearTimeout(toastTm); toastTm = null; }
 }
 
 function paintToast({ msg, type, action }) {
@@ -254,13 +260,14 @@ function paintToast({ msg, type, action }) {
     msgEl.textContent = msg;
 
     const btn = $('toastAction');
+    const closeBtn = $('toastClose');
+
     if (btn) {
         toastActionFn = action?.onClick || null;
         if (action?.label && typeof toastActionFn === 'function') {
             btn.textContent = action.label;
             btn.onclick = () => {
                 const fn = toastActionFn;
-                if (toastTm) { clearTimeout(toastTm); toastTm = null; }
                 dismissToast();
                 toastActive = false;
                 try { fn(); } catch (err) { console.error('[Toast action]', err); }
@@ -273,23 +280,66 @@ function paintToast({ msg, type, action }) {
         }
     }
 
+    if (closeBtn) {
+        if (action?.label) {
+            closeBtn.classList.remove('hidden');
+            closeBtn.onclick = () => {
+                dismissToast();
+                toastActive = false;
+                pumpToast();
+            };
+        } else {
+            closeBtn.classList.add('hidden');
+            closeBtn.onclick = null;
+        }
+    }
+
     t.style.opacity = '1';
     t.style.transform = 'translate(-50%,0)';
+    t.style.pointerEvents = 'auto';
+}
+
+function ensureToastListeners() {
+    const t = $('toast');
+    if (!t || t.dataset.hoverWired) return;
+    t.dataset.hoverWired = 'true';
+
+    t.addEventListener('mouseenter', () => {
+        if (toastTm && toastActive) {
+            clearTimeout(toastTm);
+            toastTm = null;
+            const elapsed = Date.now() - toastStartedAt;
+            toastRemainingMs = Math.max(1000, toastRemainingMs - elapsed);
+        }
+    });
+
+    t.addEventListener('mouseleave', () => {
+        if (!toastTm && toastActive) {
+            toastStartedAt = Date.now();
+            toastTm = setTimeout(() => {
+                dismissToast();
+                toastActive = false;
+                pumpToast();
+            }, toastRemainingMs);
+        }
+    });
 }
 
 function pumpToast() {
     if (toastActive) return;
     const next = toastQueue.shift();
     if (!next) return;
+    ensureToastListeners();
     toastActive = true;
     paintToast(next);
     if (toastTm) clearTimeout(toastTm);
-    // Con accion disponible se deja mas tiempo para reaccionar.
+    toastRemainingMs = next.action ? 9000 : 3000;
+    toastStartedAt = Date.now();
     toastTm = setTimeout(() => {
         dismissToast();
         toastActive = false;
         pumpToast();
-    }, next.action ? 9000 : 3000);
+    }, toastRemainingMs);
 }
 
 /**

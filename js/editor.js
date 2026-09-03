@@ -635,6 +635,10 @@ export function processText() {
    destaca un momento: con la carta entera delante, decir "hay 7" no sirve de
    mucho si no se ve donde estan. */
 function jumpToMarker() {
+    const tabProc = $('tabProcessed');
+    if (tabProc && processedView().classList.contains('hidden')) {
+        tabProc.click();
+    }
     const card = [...processedView().querySelectorAll('.field-card')]
         .find(c => countMarkers(state.proc.data[c.dataset.key] ?? '') > 0);
     if (!card) return;
